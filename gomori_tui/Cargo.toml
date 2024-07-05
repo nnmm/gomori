@@ -1,0 +1,9 @@
+[package]
+name = "gomori_tui"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ratatui = "0.27.0"
+gomori = {path = "../gomori"}
+gomori_bot_utils = {path = "../gomori_bot_utils"}
