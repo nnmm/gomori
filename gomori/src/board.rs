@@ -1,21 +1,17 @@
 mod bbox;
 mod bitboard;
 mod compact_field;
-mod dense;
 mod error;
-mod sparse;
-use std::ops::Deref;
 
 pub use bbox::*;
 pub use bitboard::*;
 pub use compact_field::*;
-pub use dense::*;
 pub use error::*;
-pub use sparse::*;
 
 pub const BOARD_SIZE: i8 = 4;
 
 use crate::{Card, CardToPlace, Field, Rank, Suit};
+use std::ops::Deref;
 
 /// Represents a board with at least one card on it.
 //
@@ -402,118 +398,21 @@ mod tests {
     use quickcheck::quickcheck;
 
     use super::*;
-    use crate::{arbitrary::PlayCardInput, card, CardToPlace, DenseBoard, SparseBoard};
+    use crate::{arbitrary::PlayCardInput, card, CardToPlace};
 
     quickcheck! {
-        fn sparse_board_equivalent_to_dense_board(input: PlayCardInput) -> bool {
-            let dense = DenseBoard::new(&input.fields);
-            let mut sparse = SparseBoard::new(input.fields);
-
-            let play_card_result_dense = dense.calculate(
-                input.card_to_place
-            );
-            let play_card_result_sparse = sparse.play_card(
-                input.card_to_place
-            );
-            match (play_card_result_dense, play_card_result_sparse) {
-                (Ok(l), Ok(r)) => {
-                    // 1. Are the won cards equivalent?
-                    let won_cards_equiv = {
-                    let cards_dense = BTreeSet::from_iter(l.cards_won);
-                    let cards_sparse =
-                        BTreeSet::from_iter(r.won_fields.iter().flat_map(|f| {
-                            f.hidden_cards.iter().cloned().chain(f.top_card)
-                        }));
-                        cards_dense == cards_sparse
-                    };
-
-                    // 2. Is the combo/no combo decision the same?
-                    let combo_equiv = l.combo == r.combo;
-
-                    // 3. Is the board equivalent?
-                    let fields_equiv = {
-                        l.execute().to_fields_vec() == sparse.fields.clone()
-                    };
-
-                    // Combine all three criteria
-                    won_cards_equiv && combo_equiv && fields_equiv
-                }
-                (Err(e1), Err(e2)) => e1 == e2,
-                (_, _) => false
-            }
-        }
-    }
-
-    quickcheck! {
-        fn possible_cards_equiv(input: PlayCardInput) -> bool {
-            let dense = DenseBoard::new(&input.fields);
-            let sparse = SparseBoard::new(input.fields);
-
-            let possible_locations_dense = dense.possible_locations_for_card(
-                input.card_to_place.card
-            ).count();
-            let possible_locations_sparse = sparse.num_possible_locations(input.card_to_place.card);
-            possible_locations_dense == possible_locations_sparse
-        }
-    }
-
-    quickcheck! {
-        fn board_equivalent_to_dense_board(input: PlayCardInput) -> bool {
-            let dense = DenseBoard::new(&input.fields);
-            let sparse = Board::new(&input.fields);
-
-            let play_card_result_dense = dense.calculate(
-                input.card_to_place
-            );
-            let play_card_result_sparse = sparse.calculate(
-                input.card_to_place
-            );
-            match (play_card_result_dense, play_card_result_sparse) {
-                (Ok(l), Ok(r)) => {
-                    // 1. Are the won cards equivalent?
-                    let won_cards_equiv = l.cards_won == r.cards_won;
-
-                    // 2. Is the combo/no combo decision the same?
-                    let combo_equiv = l.combo == r.combo;
-
-                    // 3. Is the board equivalent?
-                    let fields_equiv = {
-                        l.execute().to_fields_vec() == r.execute().to_fields_vec()
-                    };
-
-                    // Combine all three criteria
-                    won_cards_equiv && combo_equiv && fields_equiv
-                }
-                (Err(e1), Err(e2)) => e1 == e2,
-                (_, _) => false
-            }
-        }
-    }
-
-    quickcheck! {
-        fn possible_to_play_card_fn_is_consistent(input: PlayCardInput) -> bool {
+        fn possible_locations_fn(input: PlayCardInput) -> bool {
             let board = Board::new(&input.fields);
             let mut more_than_zero_locations = false;
             for (i, j) in board.locations_for_card(input.card_to_place.card) {
                 more_than_zero_locations = true;
-
-            }
-            more_than_zero_locations == board.possible_to_place_card(input.card_to_place.card)
-        }
-    }
-
-    quickcheck! {
-        fn possible_locations_do_not_result_in_errors(input: PlayCardInput) -> bool {
-            let board = Board::new(&input.fields);
-            for (i, j) in board.locations_for_card(input.card_to_place.card) {
-                eprintln!("{:?}", (i, j));
                 match board.calculate(CardToPlace { card: input.card_to_place.card, i, j, target_field_for_king_ability: None }) {
                     Ok(_) => {},
                     Err(IllegalCardPlayed::NoTargetForKingAbility) => {},
                     Err(_) => { return false; }
                 }
             }
-            true
+            more_than_zero_locations == board.possible_to_place_card(input.card_to_place.card)
         }
     }
 
