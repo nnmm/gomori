@@ -1,17 +1,16 @@
 mod bbox;
 mod bitboard;
 mod compact_field;
-mod error;
 
 pub use bbox::*;
 pub use bitboard::*;
 pub use compact_field::*;
-pub use error::*;
 
 pub const BOARD_SIZE: i8 = 4;
 
-use crate::{Card, CardToPlace, Field, Rank, Suit};
 use std::ops::Deref;
+
+use crate::{Card, CardToPlace, Field, IllegalCardPlayed, Rank, Suit};
 
 /// Represents a board with at least one card on it.
 //

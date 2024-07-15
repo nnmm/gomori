@@ -1,4 +1,4 @@
-use crate::bitset::bitset_traits;
+use crate::helpers::bitset_traits;
 use crate::{Card, Field, Rank, Suit};
 
 const TOP_CARD_INDICATOR_BIT: u64 = 0x400000000000000;

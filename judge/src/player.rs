@@ -1,7 +1,7 @@
 use std::io::{BufRead, BufReader, Write};
 use std::process::{ChildStdin, ChildStdout, Command, Stdio};
 
-use gomori::{Card, CardsSet, Color, Request, BLACK_CARDS, RED_CARDS};
+use gomori::{Color, PlayerState, Request};
 use rand::rngs::StdRng;
 use tracing::trace;
 
@@ -18,14 +18,7 @@ pub struct Player {
 
 pub struct PlayerWithGameState<'a> {
     pub player: &'a mut Player,
-    pub state: PlayerGameState,
-}
-
-/// The state for a single player.
-pub struct PlayerGameState {
-    pub draw_pile: Vec<Card>,
-    pub hand: [Card; 5],
-    pub won_cards: CardsSet,
+    pub state: PlayerState,
 }
 
 impl Player {
@@ -46,14 +39,9 @@ impl Player {
 
 impl<'a> PlayerWithGameState<'a> {
     pub fn new(player: &'a mut Player, color: Color, rng: &mut StdRng) -> Self {
-        let deck = match color {
-            Color::Black => &BLACK_CARDS,
-            Color::Red => &RED_CARDS,
-        };
-
         Self {
             player,
-            state: PlayerGameState::new(deck, rng),
+            state: PlayerState::new(color, rng),
         }
     }
 
@@ -81,21 +69,5 @@ impl<'a> PlayerWithGameState<'a> {
             );
         }
         Ok(response)
-    }
-}
-
-impl PlayerGameState {
-    pub fn new(all_cards: &[Card; 26], rng: &mut StdRng) -> Self {
-        let mut draw_pile = Vec::from(all_cards);
-
-        use rand::seq::SliceRandom;
-        draw_pile.shuffle(rng);
-        let hand = draw_pile.split_off(26 - 5).try_into().unwrap();
-
-        Self {
-            draw_pile,
-            hand,
-            won_cards: CardsSet::new(),
-        }
     }
 }

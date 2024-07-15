@@ -24,7 +24,7 @@ impl GreedyBot {
         let CardToPlace { card, i, j, .. } = card_to_place;
         card_to_place.target_field_for_king_ability = (card.rank == Rank::King).then(|| {
             let flippable_cards: Vec<_> = board
-                .into_iter()
+                .iter()
                 .filter(|(_i, _j, field)| field.top_card().is_some())
                 .collect();
             flippable_cards

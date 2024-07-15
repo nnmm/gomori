@@ -1,14 +1,15 @@
 use std::cmp::Ordering;
 
-use gomori::{Card, Color, Okay, PlayTurnResponse, Request};
+use gomori::{
+    execute_first_turn, execute_turn, Card, Color, IllegalMove, Okay, PlayTurnResponse, Request,
+    TurnOutcome,
+};
 use rand::rngs::StdRng;
 use rand::seq::SliceRandom;
 use rand::Rng;
 
-use crate::error::IllegalMove;
 use crate::player::{Player, PlayerWithGameState};
 use crate::recording::Recorder;
-use crate::turn::{execute_first_turn, execute_turn, TurnOutcome};
 
 pub enum GameResult {
     WonByPlayer { player_idx: usize },

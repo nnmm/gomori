@@ -3,8 +3,9 @@ use std::path::PathBuf;
 use clap::Parser;
 use judge::{play_game, GameResult, Player, Recorder};
 use rand::rngs::StdRng;
+use rand::SeedableRng;
 use tracing::{debug, info};
-use tracing_subscriber::EnvFilter;
+use tracing_subscriber::{filter::LevelFilter, EnvFilter};
 
 #[derive(Parser)]
 struct Args {
@@ -47,7 +48,7 @@ fn main() -> anyhow::Result<()> {
         .with_target(false)
         .compact();
     tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env())
+        .with_env_filter(EnvFilter::from_default_env().add_directive(LevelFilter::INFO.into()))
         .event_format(format)
         .init();
 
@@ -67,13 +68,8 @@ fn main() -> anyhow::Result<()> {
     };
 
     // Get a random seed
-    let seed = if let Some(seed) = args.seed {
-        seed
-    } else {
-        rand::random()
-    };
+    let seed = args.seed.unwrap_or_else(|| rand::random());
     info!(seed);
-    use rand::SeedableRng;
     let mut rng = StdRng::seed_from_u64(seed);
 
     for game_idx in 0..args.num_games {

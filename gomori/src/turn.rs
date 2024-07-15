@@ -1,9 +1,8 @@
 use std::collections::BTreeSet;
 
-use gomori::{Board, Card, Field, PlayCardCalculation, PlayTurnResponse};
+use crate::{Board, Card, Field, IllegalMove, PlayCardCalculation, PlayTurnResponse, PlayerState};
 
-use crate::{IllegalMove, PlayerGameState};
-
+/// Summarizes the outcome of playing a move.
 pub enum TurnOutcome {
     Skipped,
     Normal,
@@ -11,7 +10,7 @@ pub enum TurnOutcome {
 }
 
 pub fn execute_first_turn(
-    state: &mut PlayerGameState,
+    state: &mut PlayerState,
     card_to_place: Card,
 ) -> Result<Board, IllegalMove> {
     // Draw a new card, and validate that the card was in the hand of the player
@@ -36,7 +35,7 @@ pub fn execute_first_turn(
 }
 
 pub fn execute_turn(
-    state: &mut PlayerGameState,
+    state: &mut PlayerState,
     board: &mut Board,
     action: PlayTurnResponse,
 ) -> Result<TurnOutcome, IllegalMove> {
@@ -76,6 +75,7 @@ pub fn execute_turn(
         if !combo && !cards_to_place.is_empty() {
             return Err(IllegalMove::PlayedCardAfterEndOfCombo { card_idx });
         }
+        *board = calculation.execute();
         if combo && cards_to_place.is_empty() {
             // Is there a possible move?
             for &hand_card in hand.iter() {
@@ -85,7 +85,6 @@ pub fn execute_turn(
             }
         }
 
-        *board = calculation.execute();
         state.won_cards |= cards_won;
 
         card_idx += 1;
