@@ -1,14 +1,19 @@
 use std::str::FromStr;
 
+use pyo3::pyclass;
 use serde::{Deserialize, Serialize};
 
 /// A playing card in a standard 52-card game.
+#[pyclass]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Card {
+    #[pyo3(get, set)]
     pub suit: Suit,
+    #[pyo3(get, set)]
     pub rank: Rank,
 }
 
+#[pyclass]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum Suit {
@@ -22,6 +27,7 @@ pub enum Suit {
     Club,
 }
 
+#[pyclass]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum Rank {
@@ -59,6 +65,7 @@ impl std::fmt::Display for Card {
     }
 }
 
+// !!!!!! NOTE: Keep in sync with pymethods impl block !!!!!!
 impl Card {
     pub fn can_be_placed_on(&self, other: Card) -> bool {
         self.rank == other.rank

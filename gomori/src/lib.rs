@@ -14,5 +14,6 @@ mod errors;
 mod helpers;
 mod player_state;
 mod protocol_types;
+mod python;
 mod turn;
 mod visualization;

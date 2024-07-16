@@ -2,5 +2,5 @@
 resolver = "2"
 members = [ "greedy_bot",
     "judge", "gomori_bot_utils",
-    "gomori", "random_bot", "gomori_tui",
+    "gomori", "gomori-py", "random_bot", "gomori_tui",
 ]

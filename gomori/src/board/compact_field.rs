@@ -1,3 +1,5 @@
+use pyo3::pyclass;
+
 use crate::helpers::bitset_traits;
 use crate::{Card, Field, Rank, Suit};
 
@@ -13,6 +15,7 @@ const CLEAR_TOP_CARD_MASK: u64 = !(TOP_CARD_INDICATOR_BIT | TOP_CARD_MASK);
 /// facing up and down, because that doesn't matter for the game.
 ///
 /// Note that its "mutating" methods return a new object instead of really mutating.
+#[pyclass]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct CompactField {
     /// The low 52 bits are a bitset of the hidden cards.
@@ -22,6 +25,7 @@ pub struct CompactField {
     bits: u64,
 }
 
+// !!!!!! NOTE: Keep in sync with pymethods impl block !!!!!!
 impl CompactField {
     /// Creates an empty field.
     pub fn new() -> Self {
@@ -121,10 +125,13 @@ impl From<&Field> for CompactField {
 ///
 /// Allows intersection/union/xor with other such sets via bitwise ops.
 /// Also implements [`IntoIterator`].
+#[pyclass]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CardsSet {
     bits: u64,
 }
+
+// !!!!!! NOTE: Keep in sync with pymethods impl block !!!!!!
 impl CardsSet {
     /// Creates a new, empty set.
     pub fn new() -> Self {
@@ -133,6 +140,11 @@ impl CardsSet {
 
     pub fn len(self) -> u32 {
         self.bits.count_ones()
+    }
+
+    pub fn contains(self, card: Card) -> bool {
+        let card_idx = index_from_card(card);
+        (self.bits & (1u64 << card_idx)) != 0
     }
 
     pub fn is_empty(self) -> bool {
@@ -171,6 +183,7 @@ impl IntoIterator for CardsSet {
 }
 
 /// Iterator for a [`CardsSet`] that returns cards by ascending rank.
+#[pyclass]
 #[derive(Clone, Copy, Debug)]
 pub struct CardsSetIter {
     bits: u64,
