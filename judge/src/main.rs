@@ -5,7 +5,9 @@ use judge::{play_game, GameResult, Player, Recorder};
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 use tracing::{debug, info};
-use tracing_subscriber::{filter::LevelFilter, EnvFilter};
+use tracing_subscriber::filter::{LevelFilter, Targets};
+use tracing_subscriber::layer::{SubscriberExt};
+use tracing_subscriber::util::SubscriberInitExt;
 
 #[derive(Parser)]
 struct Args {
@@ -38,19 +40,16 @@ struct Args {
     /// Record the game's interactions as JSON files into this directory
     #[arg(short, long)]
     record_games_to_directory: Option<PathBuf>,
+
+    /// A log level among "off", "error", "warn", "info", "debug", "trace"
+    #[arg(short, long, default_value = "info")]
+    log_level: LevelFilter,
 }
 
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
-    // Initialize logging
-    let format = tracing_subscriber::fmt::format()
-        .with_target(false)
-        .compact();
-    tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env().add_directive(LevelFilter::INFO.into()))
-        .event_format(format)
-        .init();
+    initialize_logging(args.log_level);
 
     let mut player_1 = Player::new(&args.player_1_nick, &args.player_1)?;
     let mut player_2 = Player::new(&args.player_2_nick, &args.player_2)?;
@@ -118,4 +117,18 @@ fn main() -> anyhow::Result<()> {
         wins[0], args.player_1_nick, paren_1, wins[1], args.player_2_nick, paren_2, ties
     );
     Ok(())
+}
+
+fn initialize_logging(level: LevelFilter) {
+    let format = tracing_subscriber::fmt::format()
+        .with_target(false)
+        .compact();
+
+    let filter = Targets::new()
+        .with_default(level);
+
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::fmt::layer().event_format(format))
+        .with(filter)
+        .init();
 }
