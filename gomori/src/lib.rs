@@ -14,6 +14,7 @@ mod errors;
 mod helpers;
 mod player_state;
 mod protocol_types;
+#[cfg(feature = "python")]
 mod python;
 mod turn;
 mod visualization;

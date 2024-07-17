@@ -1,5 +1,6 @@
 use std::collections::BTreeSet;
 
+#[cfg(feature = "python")]
 use pyo3::pyclass;
 use serde::{Deserialize, Serialize};
 
@@ -45,7 +46,7 @@ pub enum Request {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Okay();
 
-#[pyclass]
+#[cfg_attr(feature = "python", pyclass)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Color {
@@ -56,27 +57,23 @@ pub enum Color {
 }
 
 /// A single field on the board, including coordinates.
-#[pyclass]
+#[cfg_attr(feature = "python", pyclass(get_all, set_all))]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Field {
     /// The first coordinate.
-    #[pyo3(get, set)]
     pub i: i8,
     /// The second coordinate.
-    #[pyo3(get, set)]
     pub j: i8,
     /// This may be `None` if the top card has been flipped face-down.
-    #[pyo3(get, set)]
     pub top_card: Option<Card>,
     /// Any cards below the top card, in no particular order.
     ///
     /// A card on the top that has been flipped face-down also counts as "below the top card".
-    #[pyo3(get, set)]
     pub hidden_cards: BTreeSet<Card>,
 }
 
 /// Specifies which card to play, and where.
-#[pyclass]
+#[cfg_attr(feature = "python", pyclass)]
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct CardToPlace {
     pub card: Card,
@@ -91,6 +88,6 @@ pub struct CardToPlace {
 }
 
 /// The cards to play in this turn, in order.
-#[pyclass]
+#[cfg_attr(feature = "python", pyclass)]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PlayTurnResponse(pub Vec<CardToPlace>);
