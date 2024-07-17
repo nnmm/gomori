@@ -18,5 +18,8 @@ fn gomori(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<::gomori::Suit>()?;
     m.add_class::<::gomori::CardsSet>()?;
     m.add_class::<::gomori::CompactField>()?;
+    m.add_class::<::gomori::BoundingBox>()?;
+    m.add_class::<::gomori::BitBoard>()?;
+    m.add_class::<::gomori::Board>()?;
     Ok(())
 }

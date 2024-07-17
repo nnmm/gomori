@@ -1,8 +1,12 @@
+#[cfg(feature = "python")]
+use pyo3::pyclass;
+
 /// A 2D area represented by a min + max coordinate pair.
 ///
 /// The two coordinates form an _inclusive_ 2D range, i.e. unlike in a
 /// half-open range, it's possible for a point with `i == i_max`
 /// to be contained in the area.
+#[cfg_attr(feature = "python", pyclass(get_all, set_all))]
 #[derive(Clone, Copy, Debug)]
 pub struct BoundingBox {
     pub i_min: i8,
@@ -11,7 +15,12 @@ pub struct BoundingBox {
     pub j_max: i8,
 }
 
+// !!!!!! NOTE: Keep in sync with pymethods impl block !!!!!!
 impl BoundingBox {
+    pub fn contains(&self, i: i8, j: i8) -> bool {
+        i >= self.i_min && j >= self.j_min && i <= self.i_max && j <= self.j_max
+    }
+
     pub fn singleton(i: i8, j: i8) -> Self {
         Self {
             i_min: i,

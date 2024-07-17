@@ -1,5 +1,8 @@
 use std::fmt::{self, Debug};
 
+#[cfg(feature = "python")]
+use pyo3::pyclass;
+
 static I_SHIFT: u8 = 49 + 7;
 static J_SHIFT: u8 = 49;
 static BOARD_MASK: u64 = 0x1ffffffffffff;
@@ -15,6 +18,7 @@ static IJ_MASK: u64 = 0x7ffe000000000000;
 /// means of its [`IntoIterator`] instance.
 ///
 /// Note that its "mutating" methods return a new object instead of really mutating.
+#[cfg_attr(feature = "python", pyclass)]
 #[derive(Clone, Copy)]
 pub struct BitBoard {
     /// The low 49 bits are the board itself (7x7)
@@ -36,6 +40,7 @@ pub struct BitBoard {
     bits: u64,
 }
 
+// !!!!!! NOTE: Keep in sync with pymethods impl block !!!!!!
 impl BitBoard {
     // This is only crate-public because it is valid only for a certain range of i and j
     pub(crate) fn empty_board_centered_at(i: i8, j: i8) -> Self {

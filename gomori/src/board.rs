@@ -5,6 +5,8 @@ mod compact_field;
 pub use bbox::*;
 pub use bitboard::*;
 pub use compact_field::*;
+#[cfg(feature = "python")]
+use pyo3::pyclass;
 
 pub const BOARD_SIZE: i8 = 4;
 
@@ -16,6 +18,7 @@ use crate::{Card, CardToPlace, Field, IllegalCardPlayed, Rank, Suit};
 //
 // Because after the first move, there is at least one card on it,
 // the minimum and maximum coordinates always exist.
+#[cfg_attr(feature = "python", pyclass)]
 #[derive(Clone, Debug)]
 pub struct Board {
     /// There is exactly one entry in this list for every field with at least one card on it.
@@ -46,6 +49,7 @@ pub struct PlayCardCalculation<'a> {
     pub combo: bool,
 }
 
+// !!!!!! NOTE: Keep in sync with pymethods impl block !!!!!!
 impl Board {
     /// Creates a new board from a list of fields.
     ///
