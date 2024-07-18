@@ -6,24 +6,16 @@ use rand::rngs::StdRng;
 use rand::SeedableRng;
 use tracing::{debug, info};
 use tracing_subscriber::filter::{LevelFilter, Targets};
-use tracing_subscriber::layer::{SubscriberExt};
+use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
 #[derive(Parser)]
 struct Args {
     /// Path to the executable for player 1
-    player_1: String,
+    player_1_config: PathBuf,
 
     /// Path to the executable for player 2
-    player_2: String,
-
-    /// Nickname for player 1
-    #[arg(long, default_value_t = String::from("Player 1"))]
-    player_1_nick: String,
-
-    /// Nickname for player 2
-    #[arg(long, default_value_t = String::from("Player 2"))]
-    player_2_nick: String,
+    player_2_config: PathBuf,
 
     /// How many games to play
     #[arg(short, long, default_value_t = 100)]
@@ -51,10 +43,10 @@ fn main() -> anyhow::Result<()> {
 
     initialize_logging(args.log_level);
 
-    let mut player_1 = Player::new(&args.player_1_nick, &args.player_1)?;
-    let mut player_2 = Player::new(&args.player_2_nick, &args.player_2)?;
+    let mut player_1 = Player::new(&args.player_1_config)?;
+    let mut player_2 = Player::new(&args.player_2_config)?;
 
-    let player_names = [&args.player_1_nick, &args.player_2_nick];
+    let player_names = [player_1.name.clone(), player_2.name.clone()];
 
     let mut wins = [0, 0];
     let mut illegal_moves = [0, 0];
@@ -114,7 +106,7 @@ fn main() -> anyhow::Result<()> {
     };
     eprintln!(
         "End result:\n- {} wins by {}{}\n- {} wins by {}{}\n- {} ties",
-        wins[0], args.player_1_nick, paren_1, wins[1], args.player_2_nick, paren_2, ties
+        wins[0], &player_1.name, paren_1, wins[1], player_2.name, paren_2, ties
     );
     Ok(())
 }
@@ -124,8 +116,7 @@ fn initialize_logging(level: LevelFilter) {
         .with_target(false)
         .compact();
 
-    let filter = Targets::new()
-        .with_default(level);
+    let filter = Targets::new().with_default(level);
 
     tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer().event_format(format))

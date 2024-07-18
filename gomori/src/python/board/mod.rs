@@ -2,7 +2,8 @@ mod bbox;
 mod compact_field;
 
 use pyo3::pymethods;
-use crate::{BoundingBox, Board};
+
+use crate::{Board, BoundingBox};
 
 #[pymethods]
 impl Board {

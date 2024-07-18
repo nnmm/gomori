@@ -1,9 +1,13 @@
+use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
+use std::path::Path;
 use std::process::{ChildStdin, ChildStdout, Command, Stdio};
 
+use anyhow::Context;
 use gomori::{Color, PlayerState, Request};
 use rand::rngs::StdRng;
-use tracing::trace;
+use serde::{Deserialize, Serialize};
+use tracing::{debug, trace};
 
 use crate::recording::Recorder;
 
@@ -16,20 +20,44 @@ pub struct Player {
     buf: String,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct PlayerConfig {
+    pub nick: String,
+    pub cmd: Vec<String>,
+}
+
+impl PlayerConfig {
+    pub fn load(path: &Path) -> anyhow::Result<Self> {
+        let inner = || -> anyhow::Result<PlayerConfig> {
+            let f = File::open(path)?;
+            let config = serde_json::from_reader::<_, PlayerConfig>(BufReader::new(f))
+                .context("Could not parse file as PlayerConfig JSON")?;
+            if config.cmd.is_empty() {
+                anyhow::bail!("'cmd' field cannot be empty.");
+            }
+            Ok(config)
+        };
+        inner().with_context(|| format!("Trying to read config file '{}'", path.display()))
+    }
+}
+
 pub struct PlayerWithGameState<'a> {
     pub player: &'a mut Player,
     pub state: PlayerState,
 }
 
 impl Player {
-    pub fn new(name: &str, executable_path: &str) -> anyhow::Result<Self> {
-        let child_proc = Command::new(executable_path)
+    pub fn new(path: &Path) -> anyhow::Result<Self> {
+        let config = PlayerConfig::load(path)?;
+        let child_proc = Command::new(&config.cmd[0])
+            .args(&config.cmd[1..])
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .spawn()?;
+        debug!(cmd = ?config.cmd, "Spawned child process");
 
         Ok(Self {
-            name: String::from(name),
+            name: config.nick,
             stdin: child_proc.stdin.expect("Could not access stdin"),
             stdout: BufReader::new(child_proc.stdout.expect("Could not access stdout")),
             buf: String::new(),
