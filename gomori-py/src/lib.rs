@@ -1,17 +1,9 @@
-use pyo3::create_exception;
 use pyo3::prelude::*;
-
-create_exception!(
-    gomori,
-    IllegalCardPlayed,
-    pyo3::exceptions::PyException,
-    "Describes why the card cannot be played."
-);
 
 /// A Python module implemented in Rust.
 #[pymodule]
 fn gomori(py: Python, m: &PyModule) -> PyResult<()> {
-    m.add("IllegalCardPlayed", py.get_type::<IllegalCardPlayed>())?;
+    m.add("IllegalCardPlayed", py.get_type::<::gomori::IllegalCardPlayedException>())?;
     m.add_class::<::gomori::Card>()?;
     m.add_class::<::gomori::Rank>()?;
     m.add_class::<::gomori::Suit>()?;
@@ -20,5 +12,7 @@ fn gomori(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<::gomori::BoundingBox>()?;
     m.add_class::<::gomori::BitBoard>()?;
     m.add_class::<::gomori::Board>()?;
+    m.add_class::<::gomori::CardToPlace>()?;
+    m.add_class::<::gomori::Field>()?;
     Ok(())
 }

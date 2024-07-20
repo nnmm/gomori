@@ -54,3 +54,17 @@ impl BoundingBox {
         self.j_max = self.j_max.max(j);
     }
 }
+
+#[cfg(feature = "python")]
+mod python {
+    use pyo3::pymethods;
+
+    use super::*;
+    #[pymethods]
+    impl BoundingBox {
+        #[pyo3(name = "contains")]
+        fn py_contains(&self, i: i8, j: i8) -> bool {
+            self.contains(i, j)
+        }
+    }
+}

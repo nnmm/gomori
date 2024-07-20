@@ -386,3 +386,72 @@ pub static BLACK_CARDS: [Card; 26] = [
         rank: Rank::Ace,
     },
 ];
+
+#[cfg(feature = "python")]
+mod python {
+    use pyo3::pymethods;
+
+    use super::*;
+
+    #[pymethods]
+    impl Card {
+        #[new]
+        fn py_new(rank: Rank, suit: Suit) -> Self {
+            Self { rank, suit }
+        }
+
+        // Needed for other __repr__ functions
+        pub(crate) fn __repr__(&self) -> String {
+            format!("Card({}, {})", self.rank.__repr__(), self.suit.__repr__())
+        }
+
+        fn __str__(&self) -> String {
+            self.to_string()
+        }
+
+        fn py_can_be_placed_on(&self, other: Card) -> bool {
+            self.can_be_placed_on(other)
+        }
+    }
+
+    #[pymethods]
+    impl Suit {
+        fn __repr__(&self) -> String {
+            format!("Suit.{:?}", self)
+        }
+
+        fn __str__(&self) -> &'static str {
+            match self {
+                Suit::Diamond => "♦",
+                Suit::Heart => "♥",
+                Suit::Spade => "♠",
+                Suit::Club => "♣",
+            }
+        }
+    }
+
+    #[pymethods]
+    impl Rank {
+        fn __repr__(&self) -> String {
+            format!("Rank.{:?}", self)
+        }
+
+        fn __str__(&self) -> &'static str {
+            match self {
+                Rank::Two => "2",
+                Rank::Three => "3",
+                Rank::Four => "4",
+                Rank::Five => "5",
+                Rank::Six => "6",
+                Rank::Seven => "7",
+                Rank::Eight => "8",
+                Rank::Nine => "9",
+                Rank::Ten => "10",
+                Rank::Jack => "J",
+                Rank::Queen => "Q",
+                Rank::King => "K",
+                Rank::Ace => "A",
+            }
+        }
+    }
+}

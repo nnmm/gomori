@@ -394,6 +394,43 @@ impl Diff {
     }
 }
 
+#[cfg(feature = "python")]
+mod python {
+    use pyo3::pymethods;
+
+    use crate::{BoundingBox, CardToPlace, IllegalCardPlayed};
+    use super::*;
+
+    #[pymethods]
+    impl Board {
+        #[new]
+        pub(crate) fn pseudo_new() -> Self {
+            use std::collections::BTreeSet;
+
+            use crate::{card, Field};
+            Self::new(&[Field {
+                i: 0,
+                j: 0,
+                top_card: Some(card!("4♦")),
+                hidden_cards: BTreeSet::new(),
+            }])
+        }
+
+        #[pyo3(name = "bbox")]
+        pub(crate) fn py_bbox(&self) -> BoundingBox {
+            self.bbox()
+        }
+
+        #[pyo3(name = "calculate")]
+        pub(crate) fn py_calculate(
+            &self,
+            card_to_place: CardToPlace,
+        ) -> Result<(), IllegalCardPlayed> {
+            Err(IllegalCardPlayed::OutOfBounds)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeSet;

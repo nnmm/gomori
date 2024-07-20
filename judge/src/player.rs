@@ -7,7 +7,7 @@ use anyhow::Context;
 use gomori::{Color, PlayerState, Request};
 use rand::rngs::StdRng;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, trace};
+use tracing::{info, trace};
 
 use crate::recording::Recorder;
 
@@ -54,7 +54,7 @@ impl Player {
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .spawn()?;
-        debug!(cmd = ?config.cmd, "Spawned child process");
+        info!(cmd = ?config.cmd, "Spawned child process");
 
         Ok(Self {
             name: config.nick,

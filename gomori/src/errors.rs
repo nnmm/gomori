@@ -99,3 +99,39 @@ impl std::fmt::Display for IllegalMove {
         }
     }
 }
+
+#[cfg(feature = "python")]
+mod python {
+    use pyo3::create_exception;
+    use pyo3::PyErr;
+
+    use super::*;
+
+    create_exception!(
+        gomori,
+        IllegalCardPlayedException,
+        pyo3::exceptions::PyException,
+        "Describes why the card cannot be played."
+    );
+
+    impl From<IllegalCardPlayed> for PyErr {
+        fn from(err: IllegalCardPlayed) -> PyErr {
+            IllegalCardPlayedException::new_err(err.to_string())
+        }
+    }
+
+    create_exception!(
+        gomori,
+        IllegalMoveException,
+        pyo3::exceptions::PyException,
+        "Describes why the card cannot be played."
+    );
+
+    impl From<IllegalMove> for PyErr {
+        fn from(err: IllegalMove) -> PyErr {
+            IllegalMoveException::new_err(err.to_string())
+        }
+    }
+}
+#[cfg(feature = "python")]
+pub use python::*;

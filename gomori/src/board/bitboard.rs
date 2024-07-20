@@ -282,6 +282,26 @@ impl Iterator for BitBoardIter {
     }
 }
 
+#[cfg(feature = "python")]
+mod python {
+    use pyo3::pymethods;
+
+    use super::*;
+
+    #[pymethods]
+    impl BitBoard {
+        #[pyo3(name = "contains")]
+        fn py_contains(&self, i: i8, j: i8) -> bool {
+            self.contains(i, j)
+        }
+
+        #[pyo3(name = "is_empty")]
+        fn py_is_empty(&self) -> bool {
+            self.is_empty()
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use quickcheck::quickcheck;

@@ -91,3 +91,29 @@ pub struct CardToPlace {
 #[cfg_attr(feature = "python", pyclass)]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PlayTurnResponse(pub Vec<CardToPlace>);
+
+#[cfg(feature = "python")]
+mod python {
+    use pyo3::pymethods;
+
+    use super::*;
+
+    #[pymethods]
+    impl CardToPlace {
+        #[new]
+        #[pyo3(signature = (*, card, i, j, target_field_for_king_ability=None))]
+        pub(crate) fn py_new(
+            card: Card,
+            i: i8,
+            j: i8,
+            target_field_for_king_ability: Option<(i8, i8)>,
+        ) -> Self {
+            Self {
+                card,
+                i,
+                j,
+                target_field_for_king_ability,
+            }
+        }
+    }
+}
