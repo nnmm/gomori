@@ -37,7 +37,7 @@ impl PlayerConfig {
             }
             Ok(config)
         };
-        inner().with_context(|| format!("Trying to read config file '{}'", path.display()))
+        inner().with_context(|| format!("Could not read config file '{}'", path.display()))
     }
 }
 
@@ -53,7 +53,8 @@ impl Player {
             .args(&config.cmd[1..])
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .spawn()?;
+            .spawn()
+            .with_context(|| format!("Failed to spawn child process {:?}", &config.cmd))?;
         info!(cmd = ?config.cmd, "Spawned child process");
 
         Ok(Self {
@@ -73,29 +74,36 @@ impl<'a> PlayerWithGameState<'a> {
         }
     }
 
-    pub fn perform_request<T: serde::de::DeserializeOwned + std::fmt::Debug>(
+    pub fn perform_request<T: serde::de::DeserializeOwned>(
         &mut self,
         recorder: &mut Option<Recorder>,
         req: &Request,
     ) -> anyhow::Result<T> {
-        let mut req_json = serde_json::to_string(req)?;
-        trace!(name: "Sending request", player = &self.player.name, request = %req_json);
-        req_json.push('\n');
-        self.player.stdin.write_all(req_json.as_bytes())?;
-        self.player.stdin.flush()?;
-        self.player.buf.clear();
-        self.player.stdout.read_line(&mut self.player.buf)?;
-        let serialized_response = self.player.buf.trim_end();
-        let response = serde_json::from_str::<T>(serialized_response)?;
-        trace!(name: "Recieved response", player = &self.player.name, response = %serialized_response);
-
-        if let Some(recorder) = recorder {
-            recorder.store_request(
-                &self.player.name,
-                req_json,
-                String::from(serialized_response),
-            );
-        }
-        Ok(response)
+        let mut inner = || -> anyhow::Result<T> {
+            let mut req_json = serde_json::to_string(req)?;
+            trace!(name: "Sending request", player = &self.player.name, request = %req_json);
+            req_json.push('\n');
+            self.player
+                .stdin
+                .write_all(req_json.as_bytes())
+                .context("Could not send request")?;
+            self.player.stdin.flush()?;
+            self.player.buf.clear();
+            self.player.stdout.read_line(&mut self.player.buf)?;
+            let serialized_response = self.player.buf.trim_end();
+            let response = serde_json::from_str::<T>(serialized_response).with_context(|| {
+                format!("Could not parse response '{}' as JSON", serialized_response)
+            })?;
+            trace!(name: "Recieved response", player = &self.player.name, response = %serialized_response);
+            if let Some(recorder) = recorder {
+                recorder.store_request(
+                    &self.player.name,
+                    req_json,
+                    String::from(serialized_response),
+                );
+            }
+            Ok(response)
+        };
+        inner().with_context(|| format!("Failed to make a request to '{}'", self.player.name))
     }
 }

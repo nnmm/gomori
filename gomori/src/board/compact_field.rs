@@ -359,7 +359,6 @@ mod python {
             self.into_field(i, j)
         }
     }
-
 }
 #[cfg(test)]
 mod test {

@@ -398,8 +398,8 @@ impl Diff {
 mod python {
     use pyo3::pymethods;
 
-    use crate::{BoundingBox, CardToPlace, IllegalCardPlayed};
     use super::*;
+    use crate::{BoundingBox, CardToPlace, IllegalCardPlayed};
 
     #[pymethods]
     impl Board {
