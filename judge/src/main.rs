@@ -11,10 +11,10 @@ use tracing_subscriber::util::SubscriberInitExt;
 
 #[derive(Parser)]
 struct Args {
-    /// Path to the executable for player 1
+    /// Path to the config JSON file for player 1
     player_1_config: PathBuf,
 
-    /// Path to the executable for player 2
+    /// Path to the config JSON file for player 2
     player_2_config: PathBuf,
 
     /// How many games to play

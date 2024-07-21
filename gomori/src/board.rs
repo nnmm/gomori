@@ -5,20 +5,18 @@ mod compact_field;
 pub use bbox::*;
 pub use bitboard::*;
 pub use compact_field::*;
-#[cfg(feature = "python")]
-use pyo3::pyclass;
-
-pub const BOARD_SIZE: i8 = 4;
 
 use std::ops::Deref;
 
 use crate::{Card, CardToPlace, Field, IllegalCardPlayed, Rank, Suit};
 
+pub const BOARD_SIZE: i8 = 4;
+
 /// Represents a board with at least one card on it.
 //
 // Because after the first move, there is at least one card on it,
 // the minimum and maximum coordinates always exist.
-#[cfg_attr(feature = "python", pyclass)]
+#[cfg_attr(feature = "python", pyo3::pyclass)]
 #[derive(Clone, Debug)]
 pub struct Board {
     /// There is exactly one entry in this list for every field with at least one card on it.

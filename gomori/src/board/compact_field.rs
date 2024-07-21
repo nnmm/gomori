@@ -1,6 +1,3 @@
-#[cfg(feature = "python")]
-use pyo3::pyclass;
-
 use crate::helpers::bitset_traits;
 use crate::{Card, Field, Rank, Suit};
 
@@ -16,7 +13,7 @@ const CLEAR_TOP_CARD_MASK: u64 = !(TOP_CARD_INDICATOR_BIT | TOP_CARD_MASK);
 /// facing up and down, because that doesn't matter for the game.
 ///
 /// Note that its "mutating" methods return a new object instead of really mutating.
-#[cfg_attr(feature = "python", pyclass)]
+#[cfg_attr(feature = "python", pyo3::pyclass)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct CompactField {
     /// The low 52 bits are a bitset of the hidden cards.
@@ -126,7 +123,7 @@ impl From<&Field> for CompactField {
 ///
 /// Allows intersection/union/xor with other such sets via bitwise ops.
 /// Also implements [`IntoIterator`].
-#[cfg_attr(feature = "python", pyclass)]
+#[cfg_attr(feature = "python", pyo3::pyclass)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CardsSet {
     bits: u64,
@@ -184,7 +181,7 @@ impl IntoIterator for CardsSet {
 }
 
 /// Iterator for a [`CardsSet`] that returns cards by ascending rank.
-#[cfg_attr(feature = "python", pyclass)]
+#[cfg_attr(feature = "python", pyo3::pyclass)]
 #[derive(Clone, Copy, Debug)]
 pub struct CardsSetIter {
     bits: u64,

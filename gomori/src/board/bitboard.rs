@@ -1,12 +1,49 @@
 use std::fmt::{self, Debug};
 
-#[cfg(feature = "python")]
-use pyo3::pyclass;
-
 static I_SHIFT: u8 = 49 + 7;
 static J_SHIFT: u8 = 49;
 static BOARD_MASK: u64 = 0x1ffffffffffff;
 static IJ_MASK: u64 = 0x7ffe000000000000;
+
+// A mask for the bits that do not get "shifted out" when changing the offset's i value.
+// The index into this array is (offset_i_new - offset_i + 7), clamped to (0, 14).
+static SHIFT_MASK_I: [u64; 15] = [
+    0b0000000000000000000000000000000000000000000000000,
+    0b0000000000000000000000000000000000000000001111111,
+    0b0000000000000000000000000000000000011111111111111,
+    0b0000000000000000000000000000111111111111111111111,
+    0b0000000000000000000001111111111111111111111111111,
+    0b0000000000000011111111111111111111111111111111111,
+    0b0000000111111111111111111111111111111111111111111,
+    0b1111111111111111111111111111111111111111111111111,
+    0b1111111111111111111111111111111111111111110000000,
+    0b1111111111111111111111111111111111100000000000000,
+    0b1111111111111111111111111111000000000000000000000,
+    0b1111111111111111111110000000000000000000000000000,
+    0b1111111111111100000000000000000000000000000000000,
+    0b1111111000000000000000000000000000000000000000000,
+    0b0000000000000000000000000000000000000000000000000,
+];
+
+// A mask for the bits that do not get "shifted out" when changing the offset's j value.
+// The index into this array is (offset_j_new - offset_j + 7), clamped to (0, 14).
+static SHIFT_MASK_J: [u64; 15] = [
+    0b0000000000000000000000000000000000000000000000000,
+    0b0000001000000100000010000001000000100000010000001,
+    0b0000011000001100000110000011000001100000110000011,
+    0b0000111000011100001110000111000011100001110000111,
+    0b0001111000111100011110001111000111100011110001111,
+    0b0011111001111100111110011111001111100111110011111,
+    0b0111111011111101111110111111011111101111110111111,
+    0b1111111111111111111111111111111111111111111111111,
+    0b1111110111111011111101111110111111011111101111110,
+    0b1111100111110011111001111100111110011111001111100,
+    0b1111000111100011110001111000111100011110001111000,
+    0b1110000111000011100001110000111000011100001110000,
+    0b1100000110000011000001100000110000011000001100000,
+    0b1000000100000010000001000000100000010000001000000,
+    0b0000000000000000000000000000000000000000000000000,
+];
 
 /// A [`Copy`] board representation that stores only a single
 /// bit per field.
@@ -18,7 +55,7 @@ static IJ_MASK: u64 = 0x7ffe000000000000;
 /// means of its [`IntoIterator`] instance.
 ///
 /// Note that its "mutating" methods return a new object instead of really mutating.
-#[cfg_attr(feature = "python", pyclass)]
+#[cfg_attr(feature = "python", pyo3::pyclass)]
 #[derive(Clone, Copy)]
 pub struct BitBoard {
     /// The low 49 bits are the board itself (7x7)
@@ -37,6 +74,24 @@ pub struct BitBoard {
     /// and all the numbers in [0, 63i8] start with the bits 00.
     /// Therefore, compression works by removing the highest bit,
     /// and adding it back when reading.
+    ///
+    /// How do (i, j) coordinates map to bits in the board?
+    /// (i, j) is represented as the bit number  (i * 7 + j), counted from
+    /// the least significant bit. So if you lay out a number like
+    /// 0b0000000000000011111111111111111111111111111111111 in blocks of 7
+    /// (which is also what the Debug impl does) like so:
+    ///
+    /// ```text
+    /// 0 0 0 0 0 0 0
+    /// 0 0 0 0 0 0 0
+    /// 1 1 1 1 1 1 1
+    /// 1 1 1 1 1 1 1
+    /// 1 1 1 1 1 1 1
+    /// 1 1 1 1 1 1 1
+    /// 1 1 1 1 1 1 1
+    /// ```
+    /// then this 2D array effectively has a coordinate system that has i going from the
+    /// bottom (0) to the top (6), and j going from the right (0) to the left (6).
     bits: u64,
 }
 
@@ -55,10 +110,8 @@ impl BitBoard {
         // all the cards, it will fit within the 7x7 area.
         let offset_i = i - 3;
         let offset_j = j - 3;
-        let offset_i_bits = u64::from(offset_i as u8 & 0b01111111u8) << I_SHIFT;
-        let offset_j_bits = u64::from(offset_j as u8 & 0b01111111u8) << J_SHIFT;
         Self {
-            bits: offset_i_bits | offset_j_bits,
+            bits: encode_offset(offset_i, offset_j),
         }
     }
 
@@ -165,10 +218,33 @@ impl BitBoard {
             board_bits.count_ones(),
             (board_bits_shifted & BOARD_MASK).count_ones()
         );
-        let offset_i_bits = u64::from(new_offset_i as u8 & 0b01111111u8) << I_SHIFT;
-        let offset_j_bits = u64::from(new_offset_j as u8 & 0b01111111u8) << J_SHIFT;
+        let offset_bits = encode_offset(new_offset_i, new_offset_j);
         Self {
-            bits: offset_i_bits | offset_j_bits | board_bits_shifted,
+            bits: offset_bits | board_bits_shifted,
+        }
+    }
+
+    pub(crate) fn shift_lossy(self, new_center: (i8, i8)) -> BitBoard {
+        assert!(new_center.0 >= -52);
+        assert!(new_center.1 >= -52);
+        assert!(new_center.0 <= 52);
+        assert!(new_center.1 <= 52);
+
+        let (offset_i, offset_j) = self.offset();
+        let (new_offset_i, new_offset_j) = (new_center.0 - 3, new_center.1 - 3);
+        let (diff_i, diff_j) = (new_offset_i - offset_i, new_offset_j - offset_j);
+        let mask_i = SHIFT_MASK_I[(diff_i + 7).clamp(0, 14) as usize];
+        let mask_j = SHIFT_MASK_J[(diff_j + 7).clamp(0, 14) as usize];
+        let valid_bits = self.bits & mask_i & mask_j;
+        let shift_by = diff_i * 7 + diff_j;
+        let bits_shifted = if shift_by > 0 {
+            valid_bits >> shift_by
+        } else {
+            valid_bits << shift_by.abs()
+        };
+        let offset_bits = encode_offset(new_offset_i, new_offset_j);
+        Self {
+            bits: offset_bits | bits_shifted,
         }
     }
 
@@ -224,14 +300,24 @@ impl BitBoard {
     }
 
     fn offset(self) -> (i8, i8) {
-        // The highest bit of i_compressed is garbage and needs
-        // to be replaced with the second-highest bit.
-        let offset_i_compressed = 0b01111111i8 & (self.bits >> I_SHIFT) as i8;
-        let offset_i = offset_i_compressed | ((offset_i_compressed & 0b01000000i8) << 1);
-        let offset_j_compressed = 0b01111111i8 & (self.bits >> J_SHIFT) as i8;
-        let offset_j = offset_j_compressed | ((offset_j_compressed & 0b01000000i8) << 1);
-        (offset_i, offset_j)
+        decode_offset(self.bits)
     }
+}
+
+fn decode_offset(bits: u64) -> (i8, i8) {
+    // The highest bit of i_compressed is garbage and needs
+    // to be replaced with the second-highest bit.
+    let offset_i_compressed = 0b01111111i8 & (bits >> I_SHIFT) as i8;
+    let offset_i = offset_i_compressed | ((offset_i_compressed & 0b01000000i8) << 1);
+    let offset_j_compressed = 0b01111111i8 & (bits >> J_SHIFT) as i8;
+    let offset_j = offset_j_compressed | ((offset_j_compressed & 0b01000000i8) << 1);
+    (offset_i, offset_j)
+}
+
+fn encode_offset(offset_i: i8, offset_j: i8) -> u64 {
+    let offset_i_bits = u64::from(offset_i as u8 & 0b01111111u8) << I_SHIFT;
+    let offset_j_bits = u64::from(offset_j as u8 & 0b01111111u8) << J_SHIFT;
+    offset_i_bits | offset_j_bits
 }
 
 impl Debug for BitBoard {
@@ -324,5 +410,14 @@ mod tests {
             .insert(12, 33)
             .insert(15, 30);
         assert_eq!(bb.bits, bb.recenter_to((15, 33)).recenter_to((12, 30)).bits);
+    }
+
+    #[test]
+    fn shift() {
+        let bb = BitBoard::empty_board_centered_at(12, 30)
+            .insert(12, 30)
+            .insert(12, 33)
+            .insert(15, 30);
+        assert_eq!(bb.bits, bb.shift_lossy((15, 33)).shift_lossy((12, 30)).bits);
     }
 }

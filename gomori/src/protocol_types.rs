@@ -1,7 +1,5 @@
 use std::collections::BTreeSet;
 
-#[cfg(feature = "python")]
-use pyo3::pyclass;
 use serde::{Deserialize, Serialize};
 
 use crate::Card;
@@ -46,7 +44,7 @@ pub enum Request {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Okay();
 
-#[cfg_attr(feature = "python", pyclass)]
+#[cfg_attr(feature = "python", pyo3::pyclass)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Color {
@@ -57,7 +55,7 @@ pub enum Color {
 }
 
 /// A single field on the board, including coordinates.
-#[cfg_attr(feature = "python", pyclass(get_all, set_all))]
+#[cfg_attr(feature = "python", pyo3::pyclass(get_all, set_all))]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Field {
     /// The first coordinate.
@@ -73,7 +71,7 @@ pub struct Field {
 }
 
 /// Specifies which card to play, and where.
-#[cfg_attr(feature = "python", pyclass)]
+#[cfg_attr(feature = "python", pyo3::pyclass)]
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct CardToPlace {
     pub card: Card,
@@ -88,7 +86,7 @@ pub struct CardToPlace {
 }
 
 /// The cards to play in this turn, in order.
-#[cfg_attr(feature = "python", pyclass)]
+#[cfg_attr(feature = "python", pyo3::pyclass)]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PlayTurnResponse(pub Vec<CardToPlace>);
 

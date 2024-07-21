@@ -1,12 +1,9 @@
-#[cfg(feature = "python")]
-use pyo3::pyclass;
-
 /// A 2D area represented by a min + max coordinate pair.
 ///
 /// The two coordinates form an _inclusive_ 2D range, i.e. unlike in a
 /// half-open range, it's possible for a point with `i == i_max`
 /// to be contained in the area.
-#[cfg_attr(feature = "python", pyclass(get_all, set_all))]
+#[cfg_attr(feature = "python", pyo3::pyclass(get_all, set_all))]
 #[derive(Clone, Copy, Debug)]
 pub struct BoundingBox {
     pub i_min: i8,
@@ -47,6 +44,7 @@ impl BoundingBox {
         })
     }
 
+    /// Expands the bounding box to cover point `(i, j)`.
     pub fn update(&mut self, i: i8, j: i8) {
         self.i_min = self.i_min.min(i);
         self.i_max = self.i_max.max(i);
@@ -62,9 +60,25 @@ mod python {
     use super::*;
     #[pymethods]
     impl BoundingBox {
+        #[new]
+        #[pyo3(signature = (*, i_min, j_min, i_max, j_max))]
+        fn py_new(i_min: i8, j_min: i8, i_max: i8, j_max: i8) -> Self {
+            Self {
+                i_min,
+                j_min,
+                i_max,
+                j_max,
+            }
+        }
+
         #[pyo3(name = "contains")]
         fn py_contains(&self, i: i8, j: i8) -> bool {
             self.contains(i, j)
+        }
+
+        #[pyo3(name = "update")]
+        fn py_update(&mut self, i: i8, j: i8) {
+            self.update(i, j)
         }
     }
 }
