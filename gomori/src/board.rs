@@ -56,7 +56,7 @@ pub struct PlayCardCalculation<'a> {
 impl Board {
     /// Creates a new board from a list of fields.
     ///
-    /// Panics if the fields are (obviously) invalid.
+    /// Panics if the fields are (obviously) invalid, e.g. if it is larger than 4 x 4.
     pub fn new(fields: &[Field]) -> Self {
         assert!(!fields.is_empty());
         let mut compact_fields = Vec::with_capacity(fields.len());
@@ -71,6 +71,9 @@ impl Board {
                 bitboards[suit as usize] = bitboards[suit as usize].insert(field.i, field.j);
             }
         }
+
+        assert!(bbox.dim_i() <= BOARD_SIZE as u8);
+        assert!(bbox.dim_j() <= BOARD_SIZE as u8);
 
         Self {
             fields: compact_fields,
@@ -172,7 +175,7 @@ impl Board {
 
     /// The smallest area enclosing the cards currently on the board.
     ///
-    /// This is always smaller than or equal to BOARD_SIZE x BOARD_SIZE.
+    /// This is always smaller than or equal to [`BOARD_SIZE`] x [`BOARD_SIZE`].
     ///
     /// See [`Self::playable_area()`] for the area where cards may be placed.
     pub fn bbox(&self) -> BoundingBox {
@@ -184,7 +187,7 @@ impl Board {
     /// Trying to play a card outside of these bounds will result in an
     /// out-of-bounds error.
     ///
-    /// Note that this area can be bigger than BOARD_SIZE x BOARD_SIZE,
+    /// Note that this area can be bigger than [`BOARD_SIZE`] x [`BOARD_SIZE`],
     /// e.g. if there's only a single card on the board so far, the area
     /// will be the 7 x 7 area centered on that card.
     pub fn playable_area(&self) -> BoundingBox {
@@ -263,11 +266,10 @@ impl Board {
     }
 
     pub fn is_in_bounds(&self, i: i8, j: i8) -> bool {
-        // TODO: Return false instead of panicking
-        (i.checked_sub(self.bbox.i_min).unwrap() < BOARD_SIZE)
-            && (self.bbox.i_max.checked_sub(i).unwrap() < BOARD_SIZE)
-            && (j.checked_sub(self.bbox.j_min).unwrap() < BOARD_SIZE)
-            && (self.bbox.j_max.checked_sub(j).unwrap() < BOARD_SIZE)
+        (i.checked_sub(self.bbox.i_min).map(|diff| diff < BOARD_SIZE)).unwrap_or(false)
+            && (self.bbox.i_max.checked_sub(i).map(|diff| diff < BOARD_SIZE)).unwrap_or(false)
+            && (j.checked_sub(self.bbox.j_min).map(|diff| diff < BOARD_SIZE)).unwrap_or(false)
+            && (self.bbox.j_max.checked_sub(j).map(|diff| diff < BOARD_SIZE)).unwrap_or(false)
     }
 
     pub fn to_fields_vec(&self) -> Vec<Field> {

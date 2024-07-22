@@ -41,8 +41,8 @@ pub fn execute_turn(
     board: &mut Board,
     action: PlayTurnResponse,
 ) -> Result<TurnOutcome, IllegalMove> {
-    let mut cards_to_place = action.0;
-    if cards_to_place.is_empty() {
+    let mut cards_to_play = action.0;
+    if cards_to_play.is_empty() {
         // The player wants to skip their turn. This is only allowed if there is no possible move.
         for &hand_card in &state.hand {
             if board.possible_to_play_card(hand_card) {
@@ -51,18 +51,18 @@ pub fn execute_turn(
         }
         return Ok(TurnOutcome::Skipped);
     }
-    if cards_to_place.len() > 5 {
+    if cards_to_play.len() > 5 {
         return Err(IllegalMove::PlayedMoreThanFiveCards);
     }
 
     let mut hand = BTreeSet::from(state.hand);
 
-    cards_to_place.reverse(); // So that pop() goes through them in order
+    cards_to_play.reverse(); // So that pop() goes through them in order
 
     let mut cards_won_this_turn = CardsSet::new();
 
     let mut card_idx = 0;
-    while let Some(ctp) = cards_to_place.pop() {
+    while let Some(ctp) = cards_to_play.pop() {
         let card_is_valid = hand.remove(&ctp.card);
         if !card_is_valid {
             return Err(IllegalMove::PlayedCardNotInHand);
@@ -76,11 +76,11 @@ pub fn execute_turn(
                 card: ctp.card,
                 err,
             })?;
-        if !combo && !cards_to_place.is_empty() {
+        if !combo && !cards_to_play.is_empty() {
             return Err(IllegalMove::PlayedCardAfterEndOfCombo { card_idx });
         }
         *board = calculation.execute();
-        if combo && cards_to_place.is_empty() {
+        if combo && cards_to_play.is_empty() {
             // Is there a possible move?
             for &hand_card in hand.iter() {
                 if board.possible_to_play_card(hand_card) {

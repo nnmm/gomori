@@ -41,7 +41,7 @@ impl Bot for RandomBot {
         fields: Vec<Field>,
         _cards_won_by_opponent: CardsSet,
     ) -> PlayTurnResponse {
-        let mut cards_to_place = vec![];
+        let mut cards_to_play = vec![];
 
         let mut board = Board::new(&fields);
         let mut remaining_cards: BTreeSet<Card> = BTreeSet::from(cards);
@@ -64,7 +64,7 @@ impl Bot for RandomBot {
                 card: *card,
                 target_field_for_king_ability,
             };
-            cards_to_place.push(ctp);
+            cards_to_play.push(ctp);
             remaining_cards.remove(card);
             let calculation_result = board.calculate(ctp).unwrap();
             if !calculation_result.combo {
@@ -73,6 +73,6 @@ impl Bot for RandomBot {
                 board = calculation_result.execute();
             }
         }
-        PlayTurnResponse(cards_to_place)
+        PlayTurnResponse(cards_to_play)
     }
 }

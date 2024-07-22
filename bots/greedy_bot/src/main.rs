@@ -86,13 +86,13 @@ impl Bot for GreedyBot {
         fields: Vec<Field>,
         _cards_won_by_opponent: CardsSet,
     ) -> PlayTurnResponse {
-        let mut cards_to_place = vec![];
+        let mut cards_to_play = vec![];
 
         let mut board = Board::new(&fields);
         let mut remaining_cards: BTreeSet<Card> = BTreeSet::from(cards);
 
         while let Some(card_to_play) = self.best_card_placement(&board, &remaining_cards) {
-            cards_to_place.push(card_to_play);
+            cards_to_play.push(card_to_play);
             remaining_cards.remove(&card_to_play.card);
             let plan = board.calculate(card_to_play).unwrap();
             if !plan.combo {
@@ -100,6 +100,6 @@ impl Bot for GreedyBot {
             }
             board = plan.execute();
         }
-        PlayTurnResponse(cards_to_place)
+        PlayTurnResponse(cards_to_play)
     }
 }
