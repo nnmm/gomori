@@ -40,7 +40,7 @@ struct Diff {
 pub struct PlayCardCalculation<'a> {
     /// This struct ties together the board and its diff, to prevent any possible mixups
     board: &'a Board,
-    diff: Diff,
+    pub(crate) diff: Diff,
     /// The cards that were won by this play,
     pub cards_won: CardsSet,
     /// Should another card be played?
@@ -394,26 +394,24 @@ impl Diff {
 
 #[cfg(feature = "python")]
 mod python {
-    use pyo3::pymethods;
+    use pyo3::{pyclass, pymethods, Py};
 
     use super::*;
     use crate::{BoundingBox, CardToPlace, IllegalCardPlayed};
 
+    #[pyclass]
+    pub struct PlayCardCalculation {
+        /// This struct ties together the board and its diff, to prevent any possible mixups
+        board: Py<Board>,
+        diff: Diff,
+        /// The cards that were won by this play,
+        pub cards_won: CardsSet,
+        /// Should another card be played?
+        pub combo: bool,
+    }
+
     #[pymethods]
     impl Board {
-        #[new]
-        pub(crate) fn pseudo_new() -> Self {
-            use std::collections::BTreeSet;
-
-            use crate::{card, Field};
-            Self::new(&[Field {
-                i: 0,
-                j: 0,
-                top_card: Some(card!("4♦")),
-                hidden_cards: BTreeSet::new(),
-            }])
-        }
-
         #[pyo3(name = "bbox")]
         pub(crate) fn py_bbox(&self) -> BoundingBox {
             self.bbox()
@@ -421,13 +419,25 @@ mod python {
 
         #[pyo3(name = "calculate")]
         pub(crate) fn py_calculate(
-            &self,
+            slf: Py<Self>,
             card_to_place: CardToPlace,
-        ) -> Result<(), IllegalCardPlayed> {
-            Err(IllegalCardPlayed::OutOfBounds)
+        ) -> Result<PlayCardCalculation, IllegalCardPlayed> {
+            let (diff, cards_won, combo) = pyo3::Python::with_gil(|py| {
+                slf.borrow(py)
+                    .calculate(card_to_place)
+                    .map(|calc| (calc.diff, calc.cards_won, calc.combo))
+            })?;
+            Ok(PlayCardCalculation {
+                board: slf,
+                diff,
+                cards_won,
+                combo,
+            })
         }
     }
 }
+#[cfg(feature = "python")]
+pub use python::PlayCardCalculation as PyPlayCardCalculation;
 
 #[cfg(test)]
 mod tests {
