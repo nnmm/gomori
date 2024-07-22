@@ -2,11 +2,11 @@ mod bbox;
 mod bitboard;
 mod compact_field;
 
+use std::ops::Deref;
+
 pub use bbox::*;
 pub use bitboard::*;
 pub use compact_field::*;
-
-use std::ops::Deref;
 
 use crate::{Card, CardToPlace, Field, IllegalCardPlayed, Rank, Suit};
 

@@ -8,7 +8,7 @@ use crate::{Card, CardsSet, Color, BLACK_CARDS, RED_CARDS};
 pub struct PlayerState {
     pub draw_pile: Vec<Card>,
     pub hand: [Card; 5],
-    pub won_cards: CardsSet,
+    pub cards_won: CardsSet,
 }
 
 impl PlayerState {
@@ -23,7 +23,7 @@ impl PlayerState {
         Self {
             draw_pile,
             hand,
-            won_cards: CardsSet::new(),
+            cards_won: CardsSet::new(),
         }
     }
 }

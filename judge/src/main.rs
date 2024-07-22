@@ -59,7 +59,7 @@ fn main() -> anyhow::Result<()> {
     };
 
     // Get a random seed
-    let seed = args.seed.unwrap_or_else(|| rand::random());
+    let seed = args.seed.unwrap_or_else(rand::random);
     info!(seed);
     let mut rng = StdRng::seed_from_u64(seed);
 

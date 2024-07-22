@@ -1,11 +1,13 @@
 use std::collections::BTreeSet;
 
-use crate::{Board, Card, Field, IllegalMove, PlayCardCalculation, PlayTurnResponse, PlayerState};
+use crate::{
+    Board, Card, CardsSet, Field, IllegalMove, PlayCardCalculation, PlayTurnResponse, PlayerState,
+};
 
 /// Summarizes the outcome of playing a move.
 pub enum TurnOutcome {
     Skipped,
-    Normal,
+    Normal { cards_won_this_turn: CardsSet },
     GameEnded,
 }
 
@@ -57,6 +59,8 @@ pub fn execute_turn(
 
     cards_to_place.reverse(); // So that pop() goes through them in order
 
+    let mut cards_won_this_turn = CardsSet::new();
+
     let mut card_idx = 0;
     while let Some(ctp) = cards_to_place.pop() {
         let card_is_valid = hand.remove(&ctp.card);
@@ -84,8 +88,7 @@ pub fn execute_turn(
                 }
             }
         }
-
-        state.won_cards |= cards_won;
+        cards_won_this_turn |= cards_won;
 
         card_idx += 1;
     }
@@ -103,5 +106,8 @@ pub fn execute_turn(
         };
     }
     state.hand = hand.try_into().unwrap();
-    Ok(TurnOutcome::Normal)
+    state.cards_won |= cards_won_this_turn;
+    Ok(TurnOutcome::Normal {
+        cards_won_this_turn,
+    })
 }

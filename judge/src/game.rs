@@ -1,8 +1,9 @@
 use std::cmp::Ordering;
+use std::collections::BTreeSet;
 
 use gomori::{
-    execute_first_turn, execute_turn, Card, Color, IllegalMove, Okay, PlayTurnResponse, Request,
-    TurnOutcome,
+    execute_first_turn, execute_turn, Card, CardsSet, Color, IllegalMove, Okay, PlayTurnResponse,
+    Request, TurnOutcome,
 };
 use rand::rngs::StdRng;
 use rand::seq::SliceRandom;
@@ -71,6 +72,7 @@ pub fn play_game(
     };
 
     let mut turn_skipped = false;
+    let mut cards_won_by_opponent = CardsSet::new();
     loop {
         // eprintln!("{}", board);
         current_player_idx = 1 - current_player_idx;
@@ -78,16 +80,21 @@ pub fn play_game(
         let req = Request::PlayTurn {
             cards: current_player.state.hand,
             fields: board.to_fields_vec(),
+            cards_won_by_opponent: BTreeSet::from_iter(cards_won_by_opponent),
         };
         let action: PlayTurnResponse = current_player.perform_request(recorder, &req)?;
         match execute_turn(&mut current_player.state, &mut board, action) {
-            Ok(TurnOutcome::Normal) => {
+            Ok(TurnOutcome::Normal {
+                cards_won_this_turn,
+            }) => {
                 turn_skipped = false;
+                cards_won_by_opponent = cards_won_this_turn;
             }
             Ok(TurnOutcome::GameEnded) => {
                 break;
             }
             Ok(TurnOutcome::Skipped) => {
+                cards_won_by_opponent = CardsSet::new();
                 if turn_skipped {
                     break; // When both players couldn't play a card, the game ends
                 } else {
@@ -108,8 +115,8 @@ pub fn play_game(
     }
 
     // Report who won
-    let num_cards_0 = players[0].state.won_cards.len();
-    let num_cards_1 = players[1].state.won_cards.len();
+    let num_cards_0 = players[0].state.cards_won.len();
+    let num_cards_1 = players[1].state.cards_won.len();
     let game_result = match num_cards_0.cmp(&num_cards_1) {
         Ordering::Less => GameResult::WonByPlayer { player_idx: 1 },
         Ordering::Equal => GameResult::Tie,

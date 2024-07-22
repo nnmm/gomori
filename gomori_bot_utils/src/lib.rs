@@ -1,10 +1,15 @@
-use gomori::{Card, Color, Field, Okay, PlayTurnResponse, Request};
+use gomori::{Card, CardsSet, Color, Field, Okay, PlayTurnResponse, Request};
 
 /// A trait to simplify writing bots.
 pub trait Bot {
     fn new_game(&mut self, color: Color);
     fn play_first_turn(&mut self, cards: [Card; 5]) -> Card;
-    fn play_turn(&mut self, cards: [Card; 5], fields: Vec<Field>) -> PlayTurnResponse;
+    fn play_turn(
+        &mut self,
+        cards: [Card; 5],
+        fields: Vec<Field>,
+        cards_won_by_opponent: CardsSet,
+    ) -> PlayTurnResponse;
 
     fn run(&mut self) -> anyhow::Result<()> {
         // Communication happens through stdin/stdout.
@@ -33,9 +38,14 @@ pub trait Bot {
                 Request::PlayFirstTurn { cards } => {
                     serde_json::to_writer(&mut stdout, &self.play_first_turn(cards))?
                 }
-                Request::PlayTurn { cards, fields } => {
-                    serde_json::to_writer(&mut stdout, &self.play_turn(cards, fields))?
-                }
+                Request::PlayTurn {
+                    cards,
+                    fields,
+                    cards_won_by_opponent,
+                } => serde_json::to_writer(
+                    &mut stdout,
+                    &self.play_turn(cards, fields, CardsSet::from_iter(cards_won_by_opponent)),
+                )?,
                 Request::Bye => break Ok(()),
             }
             use std::io::Write;

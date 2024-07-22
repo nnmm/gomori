@@ -32,7 +32,8 @@ pub enum Request {
         /// They are sorted by i first, then j (row-major order, if you think
         /// of i and j as matrix indices).
         fields: Vec<Field>,
-        // TODO: opponents action, or some other way of ensuring complete information
+        /// The cards won by the opponent in the previous turn.
+        cards_won_by_opponent: BTreeSet<Card>,
     },
     /// The bot should shut down.
     Bye,

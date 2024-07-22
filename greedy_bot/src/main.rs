@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use gomori::{Board, Card, CardToPlace, Color, Field, PlayTurnResponse, Rank};
+use gomori::{Board, Card, CardToPlace, CardsSet, Color, Field, PlayTurnResponse, Rank};
 use gomori_bot_utils::Bot;
 use rand::{rngs::ThreadRng, seq::SliceRandom};
 
@@ -80,7 +80,12 @@ impl Bot for GreedyBot {
         *cards.choose(&mut self.rng).unwrap()
     }
 
-    fn play_turn(&mut self, cards: [Card; 5], fields: Vec<Field>) -> PlayTurnResponse {
+    fn play_turn(
+        &mut self,
+        cards: [Card; 5],
+        fields: Vec<Field>,
+        _cards_won_by_opponent: CardsSet,
+    ) -> PlayTurnResponse {
         let mut cards_to_place = vec![];
 
         let mut board = Board::new(&fields);
