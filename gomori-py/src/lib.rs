@@ -15,7 +15,7 @@ fn gomori(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<::gomori::BoundingBox>()?;
     m.add_class::<::gomori::BitBoard>()?;
     m.add_class::<::gomori::Board>()?;
-    m.add_class::<::gomori::CardToPlace>()?;
+    m.add_class::<::gomori::CardToPlay>()?;
     m.add_class::<::gomori::Field>()?;
     m.add_class::<::gomori::PyPlayCardCalculation>()?;
     Ok(())

@@ -10,6 +10,7 @@ pub struct Card {
     pub rank: Rank,
 }
 
+/// The suit of a [card](Card).
 #[cfg_attr(feature = "python", pyo3::pyclass)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[repr(u8)]
@@ -24,6 +25,7 @@ pub enum Suit {
     Club,
 }
 
+/// The rank of a [card](Card).
 #[cfg_attr(feature = "python", pyo3::pyclass)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[repr(u8)]
@@ -102,6 +104,7 @@ impl Card {
     }
 }
 
+/// The error type for the [`FromStr`] instance of [`Card`].
 #[derive(Clone, Copy, Debug)]
 pub enum InvalidCardErr {
     LessThanTwoChars,
@@ -149,8 +152,8 @@ impl FromStr for Card {
 
 /// Shorthand for creating cards from a two-character string.
 ///
-/// The first character is the rank (note: 10 is `T`), the second is
-/// the suit as a unicode character (♦, ♥, ♠, or ♣).
+/// The first character is the [rank](Rank) (note: 10 is `T`), the second is
+/// the [suit](Suit) as a unicode character (♦, ♥, ♠, or ♣).
 ///
 /// This macro is just calling the [`FromStr`] instance of [`Card`].
 /// ```

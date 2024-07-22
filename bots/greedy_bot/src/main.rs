@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use gomori::{Board, Card, CardToPlace, CardsSet, Color, Field, PlayTurnResponse, Rank};
+use gomori::{Board, Card, CardToPlay, CardsSet, Color, Field, PlayTurnResponse, Rank};
 use gomori_bot_utils::Bot;
 use rand::{rngs::ThreadRng, seq::SliceRandom};
 
@@ -19,10 +19,10 @@ impl GreedyBot {
     fn fix_up_target_field_for_king_ability(
         &mut self,
         board: &Board,
-        card_to_place: &mut CardToPlace,
+        card_to_play: &mut CardToPlay,
     ) {
-        let CardToPlace { card, i, j, .. } = card_to_place;
-        card_to_place.target_field_for_king_ability = (card.rank == Rank::King).then(|| {
+        let CardToPlay { card, i, j, .. } = card_to_play;
+        card_to_play.target_field_for_king_ability = (card.rank == Rank::King).then(|| {
             let flippable_cards: Vec<_> = board
                 .iter()
                 .filter(|(_i, _j, field)| field.top_card().is_some())
@@ -38,20 +38,20 @@ impl GreedyBot {
         &mut self,
         board: &Board,
         cards: &BTreeSet<Card>,
-    ) -> Option<CardToPlace> {
-        let mut top_choices: Vec<CardToPlace> = Vec::new();
+    ) -> Option<CardToPlay> {
+        let mut top_choices: Vec<CardToPlay> = Vec::new();
         let mut top_score = 0;
         for &card in cards.iter() {
             for (i, j) in board.locations_for_card(card) {
-                let mut card_to_place = CardToPlace {
+                let mut card_to_play = CardToPlay {
                     card,
                     i,
                     j,
                     target_field_for_king_ability: None,
                 };
-                self.fix_up_target_field_for_king_ability(board, &mut card_to_place);
+                self.fix_up_target_field_for_king_ability(board, &mut card_to_play);
                 let card_calculation = board
-                    .calculate(card_to_place)
+                    .calculate(card_to_play)
                     .expect("Calculate error despite card being a possible location");
                 // Add a bonus for combo moves, because they have the potential to
                 // give further points
@@ -60,10 +60,10 @@ impl GreedyBot {
                 match score.cmp(&top_score) {
                     std::cmp::Ordering::Less => {}
                     std::cmp::Ordering::Equal => {
-                        top_choices.push(card_to_place);
+                        top_choices.push(card_to_play);
                     }
                     std::cmp::Ordering::Greater => {
-                        top_choices = vec![card_to_place];
+                        top_choices = vec![card_to_play];
                         top_score = score;
                     }
                 }
@@ -91,10 +91,10 @@ impl Bot for GreedyBot {
         let mut board = Board::new(&fields);
         let mut remaining_cards: BTreeSet<Card> = BTreeSet::from(cards);
 
-        while let Some(card_to_place) = self.best_card_placement(&board, &remaining_cards) {
-            cards_to_place.push(card_to_place);
-            remaining_cards.remove(&card_to_place.card);
-            let plan = board.calculate(card_to_place).unwrap();
+        while let Some(card_to_play) = self.best_card_placement(&board, &remaining_cards) {
+            cards_to_place.push(card_to_play);
+            remaining_cards.remove(&card_to_play.card);
+            let plan = board.calculate(card_to_play).unwrap();
             if !plan.combo {
                 break;
             }

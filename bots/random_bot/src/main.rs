@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use gomori::{Board, Card, CardToPlace, CardsSet, Color, Field, PlayTurnResponse, Rank};
+use gomori::{Board, Card, CardToPlay, CardsSet, Color, Field, PlayTurnResponse, Rank};
 use gomori_bot_utils::Bot;
 use rand::{rngs::ThreadRng, seq::SliceRandom};
 
@@ -58,7 +58,7 @@ impl Bot for RandomBot {
                     .copied()
                     .unwrap_or((*i, *j))
             });
-            let ctp = CardToPlace {
+            let ctp = CardToPlay {
                 i: *i,
                 j: *j,
                 card: *card,

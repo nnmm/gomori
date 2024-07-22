@@ -1,0 +1,4 @@
+{
+	"nick": "GreedyBot",
+	"cmd": ["target/release/greedy_bot"]
+}

@@ -30,7 +30,7 @@ impl std::fmt::Display for IllegalCardPlayed {
 }
 
 #[derive(Debug)]
-/// Error type for one turn.
+/// The error type for one turn.
 pub enum IllegalMove {
     PlayedCardNotInHand,
     PlayedZeroCards,

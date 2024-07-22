@@ -1,12 +1,12 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::{Card, CardToPlace, Field, Rank, Suit};
+use crate::{Card, CardToPlay, Field, Rank, Suit};
 
 #[derive(Clone, Debug)]
 pub struct PlayCardInput {
     // Nonempty
     pub fields: Vec<Field>,
-    pub card_to_place: CardToPlace,
+    pub card_to_play: CardToPlay,
 }
 
 impl quickcheck::Arbitrary for PlayCardInput {
@@ -58,7 +58,7 @@ impl quickcheck::Arbitrary for PlayCardInput {
         let i_tgt = (u8::arbitrary(g) % 4) as i8 - 2;
         let j_tgt = (u8::arbitrary(g) % 4) as i8 - 2;
         let target_field_for_king_ability = Some((i_tgt, j_tgt));
-        let card_to_place = CardToPlace {
+        let card_to_play = CardToPlay {
             card,
             i,
             j,
@@ -67,7 +67,7 @@ impl quickcheck::Arbitrary for PlayCardInput {
 
         PlayCardInput {
             fields,
-            card_to_place,
+            card_to_play,
         }
     }
 }

@@ -1,0 +1,4 @@
+{
+	"nick": "RandomBot",
+	"cmd": ["target/release/random_bot"]	
+}

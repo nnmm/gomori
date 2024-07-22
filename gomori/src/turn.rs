@@ -4,7 +4,7 @@ use crate::{
     Board, Card, CardsSet, Field, IllegalMove, PlayCardCalculation, PlayTurnResponse, PlayerState,
 };
 
-/// Summarizes the outcome of playing a move.
+/// Summarizes the outcome of playing a turn (i.e. playing up to five cards).
 pub enum TurnOutcome {
     Skipped,
     Normal { cards_won_this_turn: CardsSet },
@@ -13,12 +13,12 @@ pub enum TurnOutcome {
 
 pub fn execute_first_turn(
     state: &mut PlayerState,
-    card_to_place: Card,
+    card_to_play: Card,
 ) -> Result<Board, IllegalMove> {
     // Draw a new card, and validate that the card was in the hand of the player
     let mut card_found = false;
     for card in state.hand.iter_mut() {
-        if *card == card_to_place {
+        if *card == card_to_play {
             let next_card: Card = state.draw_pile.pop().unwrap(); // Can't fail, since it's the first turn
             let _ = std::mem::replace(card, next_card);
             card_found = true;
@@ -30,7 +30,7 @@ pub fn execute_first_turn(
         Ok(Board::new(&[Field {
             i: 0,
             j: 0,
-            top_card: Some(card_to_place),
+            top_card: Some(card_to_play),
             hidden_cards: BTreeSet::new(),
         }]))
     }
@@ -45,7 +45,7 @@ pub fn execute_turn(
     if cards_to_place.is_empty() {
         // The player wants to skip their turn. This is only allowed if there is no possible move.
         for &hand_card in &state.hand {
-            if board.possible_to_place_card(hand_card) {
+            if board.possible_to_play_card(hand_card) {
                 return Err(IllegalMove::PlayedZeroCards);
             }
         }
@@ -83,7 +83,7 @@ pub fn execute_turn(
         if combo && cards_to_place.is_empty() {
             // Is there a possible move?
             for &hand_card in hand.iter() {
-                if board.possible_to_place_card(hand_card) {
+                if board.possible_to_play_card(hand_card) {
                     return Err(IllegalMove::PrematurelyEndedCombo { card_idx });
                 }
             }

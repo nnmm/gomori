@@ -6,7 +6,7 @@ This repo contains tools for letting bots play the game of [Gomori](https://gith
 
 ```
 cargo build --release
-target/release/judge target/release/random_bot target/release/greedy_bot --player-1-nick "RandomBot" --player-2-nick "GreedyBot" -n 1000
+target/release/judge bots/random_bot.json bots/greedy_bot.json -n 1000
 ```
 
 See the `--help` text of the judge for more options.

@@ -79,19 +79,20 @@ pub struct BitBoard {
     /// (i, j) is represented as the bit number  (i * 7 + j), counted from
     /// the least significant bit. So if you lay out a number like
     /// 0b0000000000000011111111111111111111111111111111111 in blocks of 7
+    /// from least significant to most significant bit
     /// (which is also what the Debug impl does) like so:
     ///
     /// ```text
+    /// 1 1 1 1 1 1 1
+    /// 1 1 1 1 1 1 1
+    /// 1 1 1 1 1 1 1
+    /// 1 1 1 1 1 1 1
+    /// 1 1 1 1 1 1 1
     /// 0 0 0 0 0 0 0
     /// 0 0 0 0 0 0 0
-    /// 1 1 1 1 1 1 1
-    /// 1 1 1 1 1 1 1
-    /// 1 1 1 1 1 1 1
-    /// 1 1 1 1 1 1 1
-    /// 1 1 1 1 1 1 1
     /// ```
     /// then this 2D array effectively has a coordinate system that has i going from the
-    /// bottom (0) to the top (6), and j going from the right (0) to the left (6).
+    /// top (0) to the bottom (6), and j going from the left (0) to the right (6).
     bits: u64,
 }
 
@@ -324,7 +325,7 @@ impl Debug for BitBoard {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let digits = format!("{:049b}", self.bits & BOARD_MASK);
         let mut s = String::with_capacity(49 * 2);
-        for (idx, c) in digits.chars().enumerate() {
+        for (idx, c) in digits.chars().rev().enumerate() {
             s.push(c);
             if idx % 7 == 6 {
                 s.push('\n');

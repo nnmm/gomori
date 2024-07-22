@@ -72,9 +72,11 @@ pub struct Field {
 }
 
 /// Specifies which card to play, and where.
+///
+/// Used in a [`PlayTurnResponse`], and in [`calculate()`](crate::Board::calculate).
 #[cfg_attr(feature = "python", pyo3::pyclass)]
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
-pub struct CardToPlace {
+pub struct CardToPlay {
     pub card: Card,
     pub i: i8,
     pub j: i8,
@@ -89,7 +91,7 @@ pub struct CardToPlace {
 /// The cards to play in this turn, in order.
 #[cfg_attr(feature = "python", pyo3::pyclass)]
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct PlayTurnResponse(pub Vec<CardToPlace>);
+pub struct PlayTurnResponse(pub Vec<CardToPlay>);
 
 #[cfg(feature = "python")]
 mod python {
@@ -98,7 +100,7 @@ mod python {
     use super::*;
 
     #[pymethods]
-    impl CardToPlace {
+    impl CardToPlay {
         #[new]
         #[pyo3(signature = (*, card, i, j, target_field_for_king_ability=None))]
         pub(crate) fn py_new(

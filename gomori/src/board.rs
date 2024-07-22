@@ -8,11 +8,15 @@ pub use bbox::*;
 pub use bitboard::*;
 pub use compact_field::*;
 
-use crate::{Card, CardToPlace, Field, IllegalCardPlayed, Rank, Suit};
+use crate::{Card, CardToPlay, Field, IllegalCardPlayed, Rank, Suit};
 
 pub const BOARD_SIZE: i8 = 4;
 
 /// Represents a board with at least one card on it.
+///
+/// The idea is that a list of [`Field`]s is used in the communication between judge and bots,
+/// but is then converted into this type for performing the actual tasks like e.g. [determining
+/// whether a card can be played](Board::possible_to_play_card).
 //
 // Because after the first move, there is at least one card on it,
 // the minimum and maximum coordinates always exist.
@@ -29,6 +33,7 @@ pub struct Board {
     bitboards: [BitBoard; 4],
 }
 
+#[derive(Clone)]
 struct Diff {
     flipped: BitBoard,
     won: BitBoard,
@@ -72,6 +77,97 @@ impl Board {
             bbox,
             bitboards,
         }
+    }
+
+    /// Calculate playing a card and return the effects that this would have.
+    ///
+    /// This is the core function of this type. It checks whether playing the card
+    /// is legal given the other cards on the board, how many cards would be won by placing
+    /// this card, and plans out the changes that would be made to the playing board.
+    ///
+    /// The returned struct has a method to actually apply these changes to the board, and
+    /// get a new board.
+    ///
+    /// This function does not validate that the played card has not already been played
+    /// and so on.
+    pub fn calculate(
+        &self,
+        card_to_play: CardToPlay,
+    ) -> Result<PlayCardCalculation<'_>, IllegalCardPlayed> {
+        let CardToPlay { i, j, card, .. } = card_to_play;
+
+        if !self.is_in_bounds(i, j) {
+            return Err(IllegalCardPlayed::OutOfBounds);
+        }
+
+        let existing_field: Option<CompactField> = self.get(i, j);
+
+        // Check whether there is already a card on that field on which
+        // the new card cannot be placed.
+        if let Some(incompatible_card) = existing_field
+            .and_then(|f| f.top_card())
+            .filter(|&c| !card.can_be_placed_on(c))
+        {
+            return Err(IllegalCardPlayed::IncompatibleCard {
+                existing_card: incompatible_card,
+            });
+        }
+
+        // Since a field only exists when there's a card on it, existence of the
+        // field means that this is a combo.
+        let combo = existing_field.is_some();
+
+        let flipped = if combo {
+            // Activate the face card's abilities
+            self.fields_to_flip(card_to_play)?
+        } else {
+            BitBoard::empty_board_centered_at(i, j)
+        };
+
+        let won: BitBoard = {
+            // A bitboard representation of all cards of the same suit as the newly
+            // placed card. If there is a line of 4 cards, it must be cards of this
+            // suit.
+            let cards_of_same_suit = self.bitboards[card.suit as usize]
+                .recenter_to(flipped.center())
+                .insert(i, j)
+                .difference(flipped);
+            cards_of_same_suit.detect_central_lines().remove(i, j)
+        };
+
+        let cards_won = {
+            let mut set = CardsSet::new();
+            for &(i, j, field) in &self.fields {
+                if won.contains(i, j) {
+                    for card in field.hidden_cards() {
+                        set = set.insert(card);
+                    }
+                    if let Some(card) = field.top_card() {
+                        set = set.insert(card);
+                    }
+                }
+            }
+            set
+        };
+
+        Ok(PlayCardCalculation {
+            board: self,
+            diff: Diff {
+                flipped,
+                won,
+                new_card: card,
+                new_card_i: i,
+                new_card_j: j,
+            },
+            cards_won,
+            combo,
+        })
+    }
+
+    /// Shorthand for [`calculate()`](Board::calculate) immediately followed by [`execute()`](PlayCardCalculation::execute).
+    pub fn play_card(&self, card_to_play: CardToPlay) -> Result<Self, IllegalCardPlayed> {
+        self.calculate(card_to_play)
+            .map(PlayCardCalculation::execute)
     }
 
     /// The smallest area enclosing the cards currently on the board.
@@ -120,95 +216,10 @@ impl Board {
         self.bitboards[Suit::Club as usize]
     }
 
-    /// Calculate playing a card and return the effects that this would have.
-    ///
-    /// This is the core function of this type. It checks whether playing the card
-    /// is legal given the other cards on the board, how many cards would be won by placing
-    /// this card, and plans out the changes that would be made to the playing board.
-    ///
-    /// The returned struct has a method to actually apply these changes to the board, and
-    /// get a new board.
-    ///
-    /// This function does not validate that the played card has not already been played
-    /// and so on.
-    pub fn calculate(
-        &self,
-        card_to_place: CardToPlace,
-    ) -> Result<PlayCardCalculation<'_>, IllegalCardPlayed> {
-        let CardToPlace { i, j, card, .. } = card_to_place;
-
-        if !self.is_in_bounds(i, j) {
-            return Err(IllegalCardPlayed::OutOfBounds);
-        }
-
-        let existing_field: Option<CompactField> = self.get(i, j);
-
-        // Check whether there is already a card on that field on which
-        // the new card cannot be placed.
-        if let Some(incompatible_card) = existing_field
-            .and_then(|f| f.top_card())
-            .filter(|&c| !card.can_be_placed_on(c))
-        {
-            return Err(IllegalCardPlayed::IncompatibleCard {
-                existing_card: incompatible_card,
-            });
-        }
-
-        // Since a field only exists when there's a card on it, existence of the
-        // field means that this is a combo.
-        let combo = existing_field.is_some();
-
-        let flipped = if combo {
-            // Activate the face card's abilities
-            self.fields_to_flip(card_to_place)?
-        } else {
-            BitBoard::empty_board_centered_at(i, j)
-        };
-
-        let won: BitBoard = {
-            // A bitboard representation of all cards of the same suit as the newly
-            // placed card. If there is a line of 4 cards, it must be cards of this
-            // suit.
-            let cards_of_same_suit = self.bitboards[card.suit as usize]
-                .recenter_to(flipped.center())
-                .insert(i, j)
-                .difference(flipped);
-            cards_of_same_suit.detect_central_lines().remove(i, j)
-        };
-
-        let cards_won = {
-            let mut set = CardsSet::new();
-            for &(i, j, field) in &self.fields {
-                if won.contains(i, j) {
-                    for card in field.hidden_cards() {
-                        set = set.insert(card);
-                    }
-                    if let Some(card) = field.top_card() {
-                        set = set.insert(card);
-                    }
-                }
-            }
-            set
-        };
-
-        Ok(PlayCardCalculation {
-            board: self,
-            diff: Diff {
-                flipped,
-                won,
-                new_card: card,
-                new_card_i: i,
-                new_card_j: j,
-            },
-            cards_won,
-            combo,
-        })
-    }
-
     /// Is it possible to play this card anywhere?
     ///
     /// This is a bit more efficient than checking [`Self::locations_for_card()`].
-    pub fn possible_to_place_card(&self, card: Card) -> bool {
+    pub fn possible_to_play_card(&self, card: Card) -> bool {
         if self.fields.len() < 16 {
             return true;
         }
@@ -280,10 +291,10 @@ impl Board {
     // Internal helper function to compute fields where the top cards are flipped face-down.
     //
     // Note: The result also contains empty fields and fields
-    fn fields_to_flip(&self, card_to_place: CardToPlace) -> Result<BitBoard, IllegalCardPlayed> {
-        let (card_i, card_j) = (card_to_place.i, card_to_place.j);
+    fn fields_to_flip(&self, card_to_play: CardToPlay) -> Result<BitBoard, IllegalCardPlayed> {
+        let (card_i, card_j) = (card_to_play.i, card_to_play.j);
         let mut flipped = BitBoard::empty_board_centered_at(card_i, card_j);
-        match card_to_place.card.rank {
+        match card_to_play.card.rank {
             Rank::Jack => {
                 for (i, j) in [
                     (card_i - 1, card_j),
@@ -309,7 +320,7 @@ impl Board {
                 }
             }
             Rank::King => {
-                let (tgt_i, tgt_j) = card_to_place
+                let (tgt_i, tgt_j) = card_to_play
                     .target_field_for_king_ability
                     .ok_or(IllegalCardPlayed::NoTargetForKingAbility)?;
                 let field = self
@@ -397,7 +408,7 @@ mod python {
     use pyo3::{pyclass, pymethods, Py};
 
     use super::*;
-    use crate::{BoundingBox, CardToPlace, IllegalCardPlayed};
+    use crate::{BoundingBox, CardToPlay, CompactField, IllegalCardPlayed};
 
     #[pyclass]
     pub struct PlayCardCalculation {
@@ -412,19 +423,19 @@ mod python {
 
     #[pymethods]
     impl Board {
-        #[pyo3(name = "bbox")]
-        pub(crate) fn py_bbox(&self) -> BoundingBox {
-            self.bbox()
+        #[pyo3(name = "to_fields")]
+        fn py_to_fields(&self) -> Vec<(i8, i8, CompactField)> {
+            self.fields.clone()
         }
 
         #[pyo3(name = "calculate")]
         pub(crate) fn py_calculate(
             slf: Py<Self>,
-            card_to_place: CardToPlace,
+            card_to_play: CardToPlay,
         ) -> Result<PlayCardCalculation, IllegalCardPlayed> {
             let (diff, cards_won, combo) = pyo3::Python::with_gil(|py| {
                 slf.borrow(py)
-                    .calculate(card_to_place)
+                    .calculate(card_to_play)
                     .map(|calc| (calc.diff, calc.cards_won, calc.combo))
             })?;
             Ok(PlayCardCalculation {
@@ -433,6 +444,68 @@ mod python {
                 cards_won,
                 combo,
             })
+        }
+
+        #[pyo3(name = "play_card")]
+        fn py_play_card(&self, card_to_play: CardToPlay) -> Result<Board, IllegalCardPlayed> {
+            self.play_card(card_to_play)
+        }
+
+        #[pyo3(name = "bbox")]
+        fn py_bbox(&self) -> BoundingBox {
+            self.bbox()
+        }
+
+        #[pyo3(name = "playable_area")]
+        fn py_playable_area(&self) -> BoundingBox {
+            self.playable_area()
+        }
+
+        #[pyo3(name = "diamonds")]
+        fn py_diamonds(&self) -> BitBoard {
+            self.diamonds()
+        }
+
+        #[pyo3(name = "hearts")]
+        fn py_hearts(&self) -> BitBoard {
+            self.hearts()
+        }
+
+        #[pyo3(name = "spades")]
+        fn py_spades(&self) -> BitBoard {
+            self.spades()
+        }
+
+        #[pyo3(name = "clubs")]
+        fn py_clubs(&self) -> BitBoard {
+            self.clubs()
+        }
+
+        #[pyo3(name = "possible_to_play_card")]
+        fn py_possible_to_play_card(&self, card: Card) -> bool {
+            self.possible_to_play_card(card)
+        }
+
+        #[pyo3(name = "locations_for_card")]
+        fn py_locations_for_card(&self, card: Card) -> BitBoard {
+            self.locations_for_card(card)
+        }
+
+        #[pyo3(name = "get")]
+        fn py_get(&self, i: i8, j: i8) -> Option<CompactField> {
+            self.get(i, j)
+        }
+
+        #[pyo3(name = "is_in_bounds")]
+        fn py_is_in_bounds(&self, i: i8, j: i8) -> bool {
+            self.is_in_bounds(i, j)
+        }
+    }
+
+    #[pymethods]
+    impl PlayCardCalculation {
+        fn execute(&self) -> Board {
+            pyo3::Python::with_gil(|py| self.diff.clone().apply(&self.board.borrow(py)))
         }
     }
 }
@@ -446,21 +519,21 @@ mod tests {
     use quickcheck::quickcheck;
 
     use super::*;
-    use crate::{arbitrary::PlayCardInput, card, CardToPlace};
+    use crate::{arbitrary::PlayCardInput, card, CardToPlay};
 
     quickcheck! {
         fn possible_locations_fn(input: PlayCardInput) -> bool {
             let board = Board::new(&input.fields);
             let mut more_than_zero_locations = false;
-            for (i, j) in board.locations_for_card(input.card_to_place.card) {
+            for (i, j) in board.locations_for_card(input.card_to_play.card) {
                 more_than_zero_locations = true;
-                match board.calculate(CardToPlace { card: input.card_to_place.card, i, j, target_field_for_king_ability: None }) {
+                match board.calculate(CardToPlay { card: input.card_to_play.card, i, j, target_field_for_king_ability: None }) {
                     Ok(_) => {},
                     Err(IllegalCardPlayed::NoTargetForKingAbility) => {},
                     Err(_) => { return false; }
                 }
             }
-            more_than_zero_locations == board.possible_to_place_card(input.card_to_place.card)
+            more_than_zero_locations == board.possible_to_play_card(input.card_to_play.card)
         }
     }
 
@@ -494,7 +567,7 @@ mod tests {
         ]);
         let card = card!("A♦");
         let plan = board
-            .calculate(CardToPlace {
+            .calculate(CardToPlay {
                 i: -1,
                 j: -3,
                 card,
@@ -538,7 +611,7 @@ mod tests {
         ]);
         let card = card!("A♦");
         let plan = board
-            .calculate(CardToPlace {
+            .calculate(CardToPlay {
                 i: 2,
                 j: -3,
                 card,
