@@ -103,7 +103,7 @@ mod python {
     impl CardToPlay {
         #[new]
         #[pyo3(signature = (*, card, i, j, target_field_for_king_ability=None))]
-        pub(crate) fn py_new(
+        fn py_new(
             card: Card,
             i: i8,
             j: i8,
@@ -115,6 +115,14 @@ mod python {
                 j,
                 target_field_for_king_ability,
             }
+        }
+    }
+
+    #[pymethods]
+    impl PlayTurnResponse {
+        #[new]
+        fn py_new(cards_to_play: Vec<CardToPlay>) -> Self {
+            Self(cards_to_play)
         }
     }
 }

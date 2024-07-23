@@ -12,3 +12,4 @@ doc = false
 [dependencies]
 pyo3 = "0.18.1"
 gomori = { path = "../gomori", features = ["python"] }
+gomori_bot_utils = { path = "../gomori_bot_utils" }

@@ -1,5 +1,7 @@
 use pyo3::prelude::*;
 
+mod bot;
+
 /// A Python module implemented in Rust.
 #[pymodule]
 #[pyo3(name = "_gomori")]
@@ -25,5 +27,6 @@ fn gomori(py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<::gomori::PyCalculatedEffects>()?;
     m.add_class::<::gomori::Rank>()?;
     m.add_class::<::gomori::Suit>()?;
+    m.add_function(wrap_pyfunction!(bot::run_bot, m)?)?;
     Ok(())
 }

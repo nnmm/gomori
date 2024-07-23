@@ -1,0 +1,4 @@
+{
+	"nick": "SchwarzeneggerBot",
+	"cmd": [".venv/bin/python3", "bots/schwarzenegger_bot.py"]	
+}

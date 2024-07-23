@@ -244,6 +244,7 @@ name = "gomori-py"
 version = "0.1.0"
 dependencies = [
  "gomori",
+ "gomori_bot_utils",
  "pyo3",
 ]
 
