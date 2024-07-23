@@ -1,4 +1,4 @@
-# Gomori tournament
+# Computer Gomori
 
 This repo contains tools for letting bots play the game of [Gomori](https://github.com/phwitti/gomori-rules).
 
