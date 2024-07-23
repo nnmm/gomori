@@ -1,5 +1,10 @@
 # gomori-py
 
+Python wrapper around the [Rust gomori library](../gomori).
+
+> [!IMPORTANT]  
+> This is work in progress.
+
 ## Setup
 
 You'll probably want to use a virtualenv for the following steps. You can either use a pre-built wheel or build it from source yourself.
@@ -24,4 +29,4 @@ maturin develop
 
 After setup is completed, you can just `from gomori import *`.
 
-The API is pretty much the same as in Rust, so check out the documentation in that package.
+The API is pretty much the same as in Rust, so check out the documentation for that package.
