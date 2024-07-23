@@ -106,7 +106,7 @@ impl Card {
 
 /// The error type for the [`FromStr`] instance of [`Card`].
 #[derive(Clone, Copy, Debug)]
-pub enum InvalidCardErr {
+pub enum CardFromStrErr {
     LessThanTwoChars,
     MoreThanTwoChars,
     InvalidRank,
@@ -114,14 +114,14 @@ pub enum InvalidCardErr {
 }
 
 impl FromStr for Card {
-    type Err = InvalidCardErr;
+    type Err = CardFromStrErr;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut chars = s.chars();
-        let rank_char = chars.next().ok_or(InvalidCardErr::LessThanTwoChars)?;
-        let suit_char = chars.next().ok_or(InvalidCardErr::LessThanTwoChars)?;
+        let rank_char = chars.next().ok_or(CardFromStrErr::LessThanTwoChars)?;
+        let suit_char = chars.next().ok_or(CardFromStrErr::LessThanTwoChars)?;
         if chars.next().is_some() {
-            return Err(InvalidCardErr::MoreThanTwoChars);
+            return Err(CardFromStrErr::MoreThanTwoChars);
         }
         let rank = match rank_char {
             '2' => Rank::Two,
@@ -137,14 +137,14 @@ impl FromStr for Card {
             'Q' => Rank::Queen,
             'K' => Rank::King,
             'A' => Rank::Ace,
-            _ => return Err(InvalidCardErr::InvalidRank),
+            _ => return Err(CardFromStrErr::InvalidRank),
         };
         let suit = match suit_char {
             '♦' => Suit::Diamond,
             '♥' => Suit::Heart,
             '♠' => Suit::Spade,
             '♣' => Suit::Club,
-            _ => return Err(InvalidCardErr::InvalidSuit),
+            _ => return Err(CardFromStrErr::InvalidSuit),
         };
         Ok(Card { rank, suit })
     }

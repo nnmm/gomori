@@ -46,7 +46,7 @@ pub struct PlayCardCalculation<'a> {
     /// This struct ties together the board and its diff, to prevent any possible mixups
     board: &'a Board,
     pub(crate) diff: Diff,
-    /// The cards that were won by this play,
+    /// The cards that were won as a result of playing this card
     pub cards_won: CardsSet,
     /// Should another card be played?
     pub combo: bool,
@@ -132,10 +132,11 @@ impl Board {
             // placed card. If there is a line of 4 cards, it must be cards of this
             // suit.
             let cards_of_same_suit = self.bitboards[card.suit as usize]
-                .recenter_to(flipped.center())
                 .insert(i, j)
                 .difference(flipped);
-            cards_of_same_suit.detect_central_lines().remove(i, j)
+            cards_of_same_suit
+                .lines_going_through_point(i, j)
+                .remove(i, j)
         };
 
         let cards_won = {
@@ -234,6 +235,7 @@ impl Board {
         false
     }
 
+    /// Returns all the coordinates that are valid places to play the given card.
     pub fn locations_for_card(&self, card: Card) -> BitBoard {
         // Create a BitBoard with 1 in every location where any card could be played
         // so that it is not out of bounds.
@@ -243,7 +245,8 @@ impl Board {
             i_max,
             j_max,
         } = self.playable_area();
-        let (center_i, center_j) = self.bitboards[0].center();
+        let center_i = (i_min + i_max) / 2;
+        let center_j = (j_min + j_max) / 2;
         let mut bitboard = BitBoard::empty_board_centered_at(center_i, center_j)
             .insert_area(i_min, j_min, i_max, j_max);
 

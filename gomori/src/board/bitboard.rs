@@ -78,7 +78,7 @@ pub struct BitBoard {
     /// How do (i, j) coordinates map to bits in the board?
     /// (i, j) is represented as the bit number  (i * 7 + j), counted from
     /// the least significant bit. So if you lay out a number like
-    /// 0b0000000000000011111111111111111111111111111111111 in blocks of 7
+    /// 0b1100000000000011111111111111111111111111111111111 in blocks of 7
     /// from least significant to most significant bit
     /// (which is also what the Debug impl does) like so:
     ///
@@ -89,7 +89,7 @@ pub struct BitBoard {
     /// 1 1 1 1 1 1 1
     /// 1 1 1 1 1 1 1
     /// 0 0 0 0 0 0 0
-    /// 0 0 0 0 0 0 0
+    /// 0 0 0 0 0 1 1
     /// ```
     /// then this 2D array effectively has a coordinate system that has i going from the
     /// top (0) to the bottom (6), and j going from the left (0) to the right (6).
@@ -176,111 +176,52 @@ impl BitBoard {
         (self.bits & BOARD_MASK).count_ones()
     }
 
-    pub(crate) fn center(self) -> (i8, i8) {
-        let (offset_i, offset_j) = self.offset();
-        (offset_i + 3, offset_j + 3)
-    }
-
-    pub(crate) fn recenter_to(self, new_center: (i8, i8)) -> BitBoard {
-        let (offset_i, offset_j) = self.offset();
-        let (new_offset_i, new_offset_j) = (new_center.0 - 3, new_center.1 - 3);
-        debug_assert!((offset_i - new_offset_i).abs() < 4);
-        debug_assert!((offset_j - new_offset_j).abs() < 4);
-
-        let board_bits = self.bits & BOARD_MASK;
-
-        // Imagine the 49 board bits like this (top left is lowest bit, bottom right highest, and
-        // i selects the row, j the column):
-        //
-        // . . . . . . .
-        // . . . . . . .
-        // . . . . 1 . .
-        // . . 1 x . 1 .
-        // . . . . 1 n .
-        // . . . . . . .
-        // . . . . . . .
-        //
-        // The center is marked with x, cards are marked with 1 (since they are 1s in the bitset),
-        // and the new center is marked with n. We need to shift n to land on x.
-        // It's important to realize that there will never be any wraparound in the sense that a
-        // 1 lands on the other side of the board, as long as the new center is a valid center for
-        // a bitboard that contains the same cards.
-
-        let diff = (offset_i - new_offset_i) * 7 + (offset_j - new_offset_j);
-        let board_bits_shifted = if diff > 0 {
-            // Since the new center has lower coordinates, the local coordinates will have
-            // higher coordinates => shift left
-            board_bits << diff
-        } else {
-            board_bits >> diff.abs()
-        };
-        // No ones should have gotten lost
-        debug_assert_eq!(
-            board_bits.count_ones(),
-            (board_bits_shifted & BOARD_MASK).count_ones()
-        );
-        let offset_bits = encode_offset(new_offset_i, new_offset_j);
-        Self {
-            bits: offset_bits | board_bits_shifted,
-        }
-    }
-
-    pub(crate) fn shift_lossy(self, new_center: (i8, i8)) -> BitBoard {
-        assert!(new_center.0 >= -52);
-        assert!(new_center.1 >= -52);
-        assert!(new_center.0 <= 52);
-        assert!(new_center.1 <= 52);
-
-        let (offset_i, offset_j) = self.offset();
-        let (new_offset_i, new_offset_j) = (new_center.0 - 3, new_center.1 - 3);
-        let (diff_i, diff_j) = (new_offset_i - offset_i, new_offset_j - offset_j);
-        let mask_i = SHIFT_MASK_I[(diff_i + 7).clamp(0, 14) as usize];
-        let mask_j = SHIFT_MASK_J[(diff_j + 7).clamp(0, 14) as usize];
-        let valid_bits = self.bits & mask_i & mask_j;
-        let shift_by = diff_i * 7 + diff_j;
-        let bits_shifted = if shift_by > 0 {
-            valid_bits >> shift_by
-        } else {
-            valid_bits << shift_by.abs()
-        };
-        let offset_bits = encode_offset(new_offset_i, new_offset_j);
-        Self {
-            bits: offset_bits | bits_shifted,
-        }
-    }
-
-    /// Compute the difference to another `BitBoard`.
-    ///
-    /// Both boards must be centered around the same point, otherwise this
-    /// function will panic.
+    /// Computes the difference to another `BitBoard`.
     #[must_use]
     pub fn difference(self, other: BitBoard) -> BitBoard {
-        assert_eq!(self.bits & IJ_MASK, other.bits & IJ_MASK);
+        // Recenter the other bitboard to our center, which may lose some coordinates.
+        // But that's fine - since these coordinates are not representable in our bitboard,
+        // they can't be contained in our bitboard anyway.
         Self {
-            bits: self.bits & !(other.bits & BOARD_MASK),
+            bits: self.bits & !other.board_bits_shifted_to_offset_lossy(self.offset()),
         }
     }
 
+    /// Checks whether there are any horizontal, vertical or diagonal lines of length 4
+    /// passing through the specified point (in a 7 x 7 area centered on the point).
+    ///
+    /// Any lines that are found are returned in a new `BitBoard`. The result is therefore
+    /// a subset of the input.
+    ///
+    /// Only valid for point coordinates in the range `[-52, 52]`.
     #[must_use]
-    pub(crate) fn detect_central_lines(self) -> BitBoard {
+    pub fn lines_going_through_point(self, point_i: i8, point_j: i8) -> BitBoard {
+        debug_assert!(point_i >= -52);
+        debug_assert!(point_j >= -52);
+        debug_assert!(point_i <= 52);
+        debug_assert!(point_j <= 52);
+
+        let offset = (point_i - 3, point_j - 3);
+        // The bits we may lose by shifting to the new center are exactly those that are
+        // more than 3 fields away from the point. They don't count anyway.
+        let bits_centered = self.board_bits_shifted_to_offset_lossy(offset);
+
         let mut line_bits = 0;
         // These patterns are lines on the 7x7 board - horizontal, vertical, and two diagonal.
-        // They already are zero outside of BOARD_MASK, so self.bits & pattern is the same as
-        // (self.bits & BOARD_MASK) & pattern.
         for pattern in [
             0xfe00000u64,
             0x204081020408u64,
             0x1010101010101u64,
             0x41041041040u64,
         ] {
-            let pattern_intersect = self.bits & pattern;
+            let pattern_intersect = bits_centered & pattern;
             debug_assert!(pattern_intersect.count_ones() <= 4);
             if pattern_intersect.count_ones() == 4 {
                 line_bits |= pattern_intersect;
             }
         }
         Self {
-            bits: (self.bits & IJ_MASK) | line_bits,
+            bits: encode_offset(offset.0, offset.1) | line_bits,
         }
     }
 
@@ -302,6 +243,25 @@ impl BitBoard {
 
     fn offset(self) -> (i8, i8) {
         decode_offset(self.bits)
+    }
+
+    fn board_bits_shifted_to_offset_lossy(self, new_offset: (i8, i8)) -> u64 {
+        debug_assert!(new_offset.0 >= -55);
+        debug_assert!(new_offset.1 >= -55);
+        debug_assert!(new_offset.0 <= 49);
+        debug_assert!(new_offset.1 <= 49);
+
+        let (offset_i, offset_j) = self.offset();
+        let (diff_i, diff_j) = (new_offset.0 - offset_i, new_offset.1 - offset_j);
+        let mask_i = SHIFT_MASK_I[(diff_i + 7).clamp(0, 14) as usize];
+        let mask_j = SHIFT_MASK_J[(diff_j + 7).clamp(0, 14) as usize];
+        let valid_bits = self.bits & mask_i & mask_j;
+        let shift_by = diff_i * 7 + diff_j;
+        if shift_by > 0 {
+            valid_bits >> shift_by.min(63)
+        } else {
+            valid_bits << shift_by.abs().min(63)
+        }
     }
 }
 
@@ -386,6 +346,24 @@ mod python {
         fn py_is_empty(&self) -> bool {
             self.is_empty()
         }
+
+        #[pyo3(name = "difference")]
+        fn py_difference(&self, other: BitBoard) -> BitBoard {
+            self.difference(other)
+        }
+
+        #[pyo3(name = "lines_going_through_point")]
+        fn py_lines_going_through_point(&self, point_i: i8, point_j: i8) -> BitBoard {
+            self.lines_going_through_point(point_i, point_j)
+        }
+
+        fn __len__(&self) -> usize {
+            self.num_entries() as usize
+        }
+
+        fn __bool__(&self) -> bool {
+            !self.is_empty()
+        }
     }
 }
 
@@ -405,20 +383,47 @@ mod tests {
     }
 
     #[test]
-    fn recenter() {
+    fn shift_far() {
         let bb = BitBoard::empty_board_centered_at(12, 30)
+            .insert(11, 32)
             .insert(12, 30)
             .insert(12, 33)
             .insert(15, 30);
-        assert_eq!(bb.bits, bb.recenter_to((15, 33)).recenter_to((12, 30)).bits);
+        // None of the coordinates on the board are representable with that offset.
+        let bits_shifted = bb.board_bits_shifted_to_offset_lossy((0, 0));
+        assert_eq!(bits_shifted, 0);
     }
 
     #[test]
     fn shift() {
         let bb = BitBoard::empty_board_centered_at(12, 30)
-            .insert(12, 30)
+            .insert(11, 32)
+            .insert(12, 31)
             .insert(12, 33)
             .insert(15, 30);
-        assert_eq!(bb.bits, bb.shift_lossy((15, 33)).shift_lossy((12, 30)).bits);
+        let (offset_i, offset_j) = (11, 31);
+        let bits_shifted = bb.board_bits_shifted_to_offset_lossy((offset_i, offset_j));
+        let bb_shifted = BitBoard {
+            bits: bits_shifted | encode_offset(offset_i, offset_j),
+        };
+        let coordinates_after_shift = Vec::from_iter(bb_shifted);
+        assert_eq!(coordinates_after_shift, vec![(11, 32), (12, 31), (12, 33)]);
+    }
+
+    #[test]
+    fn detect_line() {
+        let bb = BitBoard::empty_board_centered_at(10, 10)
+            .insert(8, 11)
+            .insert(11, 11)
+            .insert(12, 11)
+            .insert(13, 11);
+        assert_eq!(
+            Vec::from_iter(bb.lines_going_through_point(11, 11)),
+            Vec::from_iter(bb)
+        );
+        assert_eq!(
+            Vec::from_iter(bb.lines_going_through_point(9, 9)),
+            Vec::new()
+        );
     }
 }
