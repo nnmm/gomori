@@ -42,10 +42,13 @@ struct Diff {
     new_card_j: i8,
 }
 
-pub struct PlayCardCalculation<'a> {
+/// The effects that playing a card would have.
+///
+/// Returned by [`Board::execute()`].
+pub struct CalculatedEffects<'a> {
     /// This struct ties together the board and its diff, to prevent any possible mixups
     board: &'a Board,
-    pub(crate) diff: Diff,
+    diff: Diff,
     /// The cards that were won as a result of playing this card
     pub cards_won: CardsSet,
     /// Should another card be played?
@@ -72,8 +75,8 @@ impl Board {
             }
         }
 
-        assert!(bbox.dim_i() <= BOARD_SIZE as u8);
-        assert!(bbox.dim_j() <= BOARD_SIZE as u8);
+        assert!(bbox.size_i() <= BOARD_SIZE as u8);
+        assert!(bbox.size_j() <= BOARD_SIZE as u8);
 
         Self {
             fields: compact_fields,
@@ -96,7 +99,7 @@ impl Board {
     pub fn calculate(
         &self,
         card_to_play: CardToPlay,
-    ) -> Result<PlayCardCalculation<'_>, IllegalCardPlayed> {
+    ) -> Result<CalculatedEffects<'_>, IllegalCardPlayed> {
         let CardToPlay { i, j, card, .. } = card_to_play;
 
         if !self.is_in_bounds(i, j) {
@@ -154,7 +157,7 @@ impl Board {
             set
         };
 
-        Ok(PlayCardCalculation {
+        Ok(CalculatedEffects {
             board: self,
             diff: Diff {
                 flipped,
@@ -168,10 +171,9 @@ impl Board {
         })
     }
 
-    /// Shorthand for [`calculate()`](Board::calculate) immediately followed by [`execute()`](PlayCardCalculation::execute).
+    /// Shorthand for [`calculate()`](Board::calculate) immediately followed by [`execute()`](CalculatedEffects::execute).
     pub fn play_card(&self, card_to_play: CardToPlay) -> Result<Self, IllegalCardPlayed> {
-        self.calculate(card_to_play)
-            .map(PlayCardCalculation::execute)
+        self.calculate(card_to_play).map(CalculatedEffects::execute)
     }
 
     /// The smallest area enclosing the cards currently on the board.
@@ -350,7 +352,7 @@ impl Deref for Board {
     }
 }
 
-impl<'a> PlayCardCalculation<'a> {
+impl<'a> CalculatedEffects<'a> {
     /// Apply the computed changes from playing the card.
     pub fn execute(self) -> Board {
         self.diff.apply(self.board)
@@ -416,13 +418,14 @@ mod python {
     use crate::{BoundingBox, CardToPlay, CompactField, IllegalCardPlayed};
 
     #[pyclass]
-    pub struct PlayCardCalculation {
-        /// This struct ties together the board and its diff, to prevent any possible mixups
+    pub struct CalculatedEffects {
         board: Py<Board>,
         diff: Diff,
         /// The cards that were won by this play,
+        #[pyo3(get)]
         pub cards_won: CardsSet,
         /// Should another card be played?
+        #[pyo3(get)]
         pub combo: bool,
     }
 
@@ -437,13 +440,13 @@ mod python {
         pub(crate) fn py_calculate(
             slf: Py<Self>,
             card_to_play: CardToPlay,
-        ) -> Result<PlayCardCalculation, IllegalCardPlayed> {
+        ) -> Result<CalculatedEffects, IllegalCardPlayed> {
             let (diff, cards_won, combo) = pyo3::Python::with_gil(|py| {
                 slf.borrow(py)
                     .calculate(card_to_play)
                     .map(|calc| (calc.diff, calc.cards_won, calc.combo))
             })?;
-            Ok(PlayCardCalculation {
+            Ok(CalculatedEffects {
                 board: slf,
                 diff,
                 cards_won,
@@ -508,14 +511,16 @@ mod python {
     }
 
     #[pymethods]
-    impl PlayCardCalculation {
+    impl CalculatedEffects {
         fn execute(&self) -> Board {
             pyo3::Python::with_gil(|py| self.diff.clone().apply(&self.board.borrow(py)))
         }
     }
 }
+
 #[cfg(feature = "python")]
-pub use python::PlayCardCalculation as PyPlayCardCalculation;
+#[doc(hidden)]
+pub use python::CalculatedEffects as PyCalculatedEffects;
 
 #[cfg(test)]
 mod tests {

@@ -15,12 +15,12 @@ pub struct BoundingBox {
 // !!!!!! NOTE: Keep in sync with pymethods impl block !!!!!!
 impl BoundingBox {
     /// The size of the bounding box along the `i` dimension.
-    pub fn dim_i(&self) -> u8 {
+    pub fn size_i(&self) -> u8 {
         (self.i_max - self.i_min) as u8 + 1
     }
 
     /// The size of the bounding box along the `j` dimension.
-    pub fn dim_j(&self) -> u8 {
+    pub fn size_j(&self) -> u8 {
         (self.j_max - self.j_min) as u8 + 1
     }
 
@@ -81,14 +81,14 @@ mod python {
             }
         }
 
-        #[pyo3(name = "dim_i")]
-        fn py_dim_i(&self) -> u8 {
-            self.dim_i()
+        #[pyo3(name = "size_i")]
+        fn py_size_i(&self) -> u8 {
+            self.size_i()
         }
 
-        #[pyo3(name = "dim_j")]
-        fn py_dim_j(&self) -> u8 {
-            self.dim_j()
+        #[pyo3(name = "size_j")]
+        fn py_size_j(&self) -> u8 {
+            self.size_j()
         }
 
         #[pyo3(name = "contains")]

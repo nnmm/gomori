@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use crate::{
-    Board, Card, CardsSet, Field, IllegalMove, PlayCardCalculation, PlayTurnResponse, PlayerState,
+    Board, CalculatedEffects, Card, CardsSet, Field, IllegalMove, PlayTurnResponse, PlayerState,
 };
 
 /// Summarizes the outcome of playing a turn (i.e. playing up to five cards).
@@ -67,7 +67,7 @@ pub fn execute_turn(
         if !card_is_valid {
             return Err(IllegalMove::PlayedCardNotInHand);
         }
-        let calculation @ PlayCardCalculation {
+        let calculation @ CalculatedEffects {
             cards_won, combo, ..
         } = board
             .calculate(ctp)
