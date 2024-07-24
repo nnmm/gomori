@@ -45,6 +45,7 @@ pub enum Request {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Okay();
 
+/// Black or white.
 #[cfg_attr(feature = "python", pyo3::pyclass)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]

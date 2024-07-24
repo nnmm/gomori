@@ -5,6 +5,16 @@ use crate::Card;
 /// Allows intersection/union/xor with other such sets via bitwise ops.
 /// Also implements [`IntoIterator`], so it can be converted into e.g.
 /// a vector with `Vec::from_iter(cards_set)`.
+///
+/// ```
+/// use gomori::{card, CardsSet};
+/// let mut set = CardsSet::new();
+/// // This is an immutable data type, so functions like `insert` return a new `CardsSet`.
+/// set = set.insert(card!("7♥"));
+/// set = set.insert(card!("7♥"));  // Inserting a second time has no effect
+/// set = set.insert(card!("2♥"));
+/// assert_eq!(Vec::from_iter(set), vec![card!("2♥"), card!("7♥")]);
+/// ```
 #[cfg_attr(feature = "python", pyo3::pyclass)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CardsSet {

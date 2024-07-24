@@ -44,7 +44,7 @@ struct Diff {
 
 /// The effects that playing a card would have.
 ///
-/// Returned by [`Board::execute()`].
+/// Returned by [`Board::calculate()`].
 pub struct CalculatedEffects<'a> {
     /// This struct ties together the board and its diff, to prevent any possible mixups
     board: &'a Board,
@@ -146,12 +146,7 @@ impl Board {
             let mut set = CardsSet::new();
             for &(i, j, field) in &self.fields {
                 if won.contains(i, j) {
-                    for card in field.hidden_cards() {
-                        set = set.insert(card);
-                    }
-                    if let Some(card) = field.top_card() {
-                        set = set.insert(card);
-                    }
+                    set |= field.all_cards();
                 }
             }
             set
@@ -255,6 +250,17 @@ impl Board {
         for &(i, j, field) in &self.fields {
             if !field.can_place_card(card) {
                 bitboard = bitboard.remove(i, j);
+            }
+        }
+        bitboard
+    }
+
+    /// Returns all the coordinates that already have a card on them and are valid places to play the given card.
+    pub fn combo_locations_for_card(&self, card: Card) -> BitBoard {
+        let mut bitboard = BitBoard::empty_board_centered_at(self.fields[0].0, self.fields[0].1);
+        for &(i, j, field) in &self.fields {
+            if field.can_place_card(card) {
+                bitboard = bitboard.insert(i, j);
             }
         }
         bitboard
@@ -497,6 +503,11 @@ mod python {
         #[pyo3(name = "locations_for_card")]
         fn py_locations_for_card(&self, card: Card) -> BitBoard {
             self.locations_for_card(card)
+        }
+
+        #[pyo3(name = "combo_locations_for_card")]
+        fn py_combo_locations_for_card(&self, card: Card) -> BitBoard {
+            self.combo_locations_for_card(card)
         }
 
         #[pyo3(name = "get")]

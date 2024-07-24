@@ -87,7 +87,7 @@ impl CompactField {
 
     /// All cards on the field.
     ///
-    /// Equal to [`hidden_cards()`] + [`top_card()`], if any.
+    /// Equal to [`hidden_cards()`](Self::hidden_cards) + [`top_card()`](Self::top_card), if any.
     pub fn all_cards(self) -> CardsSet {
         if let Some(c) = self.top_card() {
             self.hidden_cards().insert(c)

@@ -124,7 +124,7 @@ mod python {
         gomori,
         IllegalMoveException,
         pyo3::exceptions::PyException,
-        "Describes why the card cannot be played."
+        "Describes why a move is illegal."
     );
 
     impl From<IllegalMove> for PyErr {
