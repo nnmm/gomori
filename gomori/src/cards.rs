@@ -102,6 +102,29 @@ impl Card {
         let codepoint = 0x1F0A0 + 16 * row + col;
         char::from_u32(codepoint).unwrap()
     }
+
+    // INTERNAL - maps a card onto its "index", a number less than 52
+    #[inline]
+    pub(crate) fn to_index(self) -> u8 {
+        (self.rank as u8) << 2 | self.suit as u8
+    }
+
+    // INTERNAL - inverse of index_from_cards()
+    //
+    // Must remain internal because it's unchecked.
+    #[inline]
+    pub(crate) fn from_index(bits: u8) -> Self {
+        // Fuck it, we transmute
+        // SAFETY: This function is internal to this crate and only used on
+        // bit patterns created by to_index(). In effect, both rank and
+        // suit are just cast to their underlying repr and back, which is fine.
+        unsafe {
+            Card {
+                rank: std::mem::transmute::<u8, Rank>(bits >> 2),
+                suit: std::mem::transmute::<u8, Suit>(bits & 3),
+            }
+        }
+    }
 }
 
 /// The error type for the [`FromStr`] instance of [`Card`].
@@ -454,5 +477,33 @@ mod python {
                 Rank::Ace => "A",
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Card with the lowest index
+    const CARD_1: Card = Card {
+        rank: Rank::Two,
+        suit: Suit::Diamond,
+    };
+    // Card with the highest index
+    const CARD_2: Card = Card {
+        rank: Rank::Ace,
+        suit: Suit::Club,
+    };
+    // Some other card
+    const CARD_3: Card = Card {
+        rank: Rank::Queen,
+        suit: Suit::Heart,
+    };
+
+    #[test]
+    fn index_is_isomorphic_to_card() {
+        assert_eq!(Card::from_index(CARD_1.to_index()), CARD_1);
+        assert_eq!(Card::from_index(CARD_2.to_index()), CARD_2);
+        assert_eq!(Card::from_index(CARD_3.to_index()), CARD_3);
     }
 }

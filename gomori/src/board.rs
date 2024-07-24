@@ -8,7 +8,7 @@ pub use bbox::*;
 pub use bitboard::*;
 pub use compact_field::*;
 
-use crate::{Card, CardToPlay, Field, IllegalCardPlayed, Rank, Suit};
+use crate::{Card, CardToPlay, CardsSet, Field, IllegalCardPlayed, Rank, Suit};
 
 pub const BOARD_SIZE: i8 = 4;
 
