@@ -85,6 +85,17 @@ impl CompactField {
         }
     }
 
+    /// All cards on the field.
+    ///
+    /// Equal to [`hidden_cards()`] + [`top_card()`], if any.
+    pub fn all_cards(self) -> CardsSet {
+        if let Some(c) = self.top_card() {
+            self.hidden_cards().insert(c)
+        } else {
+            self.hidden_cards()
+        }
+    }
+
     pub fn into_field(self, i: i8, j: i8) -> Field {
         Field {
             i,
@@ -162,6 +173,11 @@ mod python {
         #[pyo3(name = "hidden_cards")]
         fn py_hidden_cards(&self) -> CardsSet {
             self.hidden_cards()
+        }
+
+        #[pyo3(name = "all_cards")]
+        fn py_all_cards(&self) -> CardsSet {
+            self.all_cards()
         }
 
         #[pyo3(name = "into_field")]
