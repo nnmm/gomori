@@ -1,3 +1,6 @@
+mod card_counting;
+pub use card_counting::*;
+
 use gomori::{Card, CardsSet, Color, Field, Okay, PlayTurnResponse, Request};
 
 /// A trait to simplify writing bots.
