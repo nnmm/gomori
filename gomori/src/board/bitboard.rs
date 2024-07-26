@@ -111,13 +111,33 @@ impl BitBoard {
         }
     }
 
-    /// Set the bit for the specified coordinate to `true`.
+    /// Checks whether the given coordinate is contained in the set.
+    pub fn contains(self, i: i8, j: i8) -> bool {
+        let (offset_i, offset_j) = self.offset();
+        let i_local = if let Some(i_local) = i.checked_sub(offset_i) {
+            i_local
+        } else {
+            return false;
+        };
+        let j_local = if let Some(j_local) = j.checked_sub(offset_j) {
+            j_local
+        } else {
+            return false;
+        };
+        if i_local >= 7 || j_local >= 7 {
+            return false;
+        }
+        let idx = i_local * 7 + j_local;
+        self.bits & (1u64 << idx) != 0
+    }
+
+    /// Sets the bit for the specified coordinate to `true`.
     ///
     /// This function must only be used with coordinates in the underlying board's [`playable_area`](crate::Board::playable_area).
     /// Other coordinates may exceed the 7x7 area stored in the `BitBoard`, and that will cause a panic in debug mode.
-    /// In release mode, no checks are performed, and data
+    /// In release mode, no checks are performed, it will just cause invalid data.
     #[must_use]
-    pub(crate) fn insert(self, i: i8, j: i8) -> Self {
+    pub fn insert(self, i: i8, j: i8) -> Self {
         let idx = self.arr_idx(i, j);
         Self {
             bits: self.bits | (1u64 << idx),
@@ -137,31 +157,15 @@ impl BitBoard {
         Self { bits }
     }
 
+    /// Sets the bit for the specified coordinate to `true`.
+    ///
+    /// The same restriction as for [`insert()`](Self::insert) applies.
     #[must_use]
-    pub(crate) fn remove(self, i: i8, j: i8) -> Self {
+    pub fn remove(self, i: i8, j: i8) -> Self {
         let idx = self.arr_idx(i, j);
         Self {
             bits: self.bits & !(1u64 << idx),
         }
-    }
-
-    pub fn contains(self, i: i8, j: i8) -> bool {
-        let (offset_i, offset_j) = self.offset();
-        let i_local = if let Some(i_local) = i.checked_sub(offset_i) {
-            i_local
-        } else {
-            return false;
-        };
-        let j_local = if let Some(j_local) = j.checked_sub(offset_j) {
-            j_local
-        } else {
-            return false;
-        };
-        if i_local >= 7 || j_local >= 7 {
-            return false;
-        }
-        let idx = i_local * 7 + j_local;
-        self.bits & (1u64 << idx) != 0
     }
 
     pub fn is_empty(self) -> bool {
@@ -419,6 +423,16 @@ mod python {
         #[pyo3(name = "contains")]
         fn py_contains(&self, i: i8, j: i8) -> bool {
             self.contains(i, j)
+        }
+
+        #[pyo3(name = "insert")]
+        fn py_insert(&self, i: i8, j: i8) -> BitBoard {
+            self.insert(i, j)
+        }
+
+        #[pyo3(name = "remove")]
+        fn py_remove(&self, i: i8, j: i8) -> BitBoard {
+            self.remove(i, j)
         }
 
         #[pyo3(name = "is_empty")]
