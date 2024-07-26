@@ -457,6 +457,17 @@ mod python {
         fn __bool__(&self) -> bool {
             !self.is_empty()
         }
+
+        // Python exclusive
+        fn to_matrix_and_offset(&self) -> ([[bool; 7]; 7], (i8, i8)) {
+            let arr = std::array::from_fn(|i_local| {
+                std::array::from_fn(|j_local| {
+                    let idx = i_local * 7 + j_local;
+                    self.bits & (1u64 << idx) != 0
+                })
+            });
+            (arr, self.offset())
+        }
     }
 }
 
