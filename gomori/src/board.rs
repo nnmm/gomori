@@ -27,6 +27,10 @@ pub struct Board {
     ///
     /// The `bbox` and `bitboards` fields are derived from this list.
     fields: Vec<(i8, i8, CompactField)>,
+    /// The center coordinate for all bitboards produced by this board.
+    /// Using a consistent center coordinate enables binary operations like bitwise or.
+    /// See also the bitboard docs.
+    bitboards_center: (i8, i8),
     /// The smallest area that contains all cards.
     bbox: BoundingBox,
     /// All the diamond/heart/spade/club cards on the board.
@@ -63,8 +67,9 @@ impl Board {
     pub fn new(fields: &[Field]) -> Self {
         assert!(!fields.is_empty());
         let mut compact_fields = Vec::with_capacity(fields.len());
+        let bitboards_center = (fields[0].i, fields[0].j);
         let mut bbox = BoundingBox::singleton(fields[0].i, fields[0].j);
-        let mut bitboards = [BitBoard::empty_board_centered_at(fields[0].i, fields[0].j); 4];
+        let mut bitboards = [BitBoard::empty_board_centered_at(bitboards_center); 4];
 
         for field in fields {
             debug_assert!(field.top_card.is_some() || !field.hidden_cards.is_empty());
@@ -80,6 +85,7 @@ impl Board {
 
         Self {
             fields: compact_fields,
+            bitboards_center,
             bbox,
             bitboards,
         }
@@ -127,7 +133,7 @@ impl Board {
             // Activate the face card's abilities
             self.fields_to_flip(card_to_play)?
         } else {
-            BitBoard::empty_board_centered_at(i, j)
+            BitBoard::empty_board_centered_at(self.bitboards_center)
         };
 
         let won: BitBoard = {
@@ -242,9 +248,7 @@ impl Board {
             i_max,
             j_max,
         } = self.playable_area();
-        let center_i = (i_min + i_max) / 2;
-        let center_j = (j_min + j_max) / 2;
-        let mut bitboard = BitBoard::empty_board_centered_at(center_i, center_j)
+        let mut bitboard = BitBoard::empty_board_centered_at(self.bitboards_center)
             .insert_area(i_min, j_min, i_max, j_max);
 
         for &(i, j, field) in &self.fields {
@@ -257,7 +261,7 @@ impl Board {
 
     /// Returns all the coordinates that already have a card on them and are valid places to play the given card.
     pub fn combo_locations_for_card(&self, card: Card) -> BitBoard {
-        let mut bitboard = BitBoard::empty_board_centered_at(self.fields[0].0, self.fields[0].1);
+        let mut bitboard = BitBoard::empty_board_centered_at(self.bitboards_center);
         for &(i, j, field) in &self.fields {
             if field.can_place_card(card) {
                 bitboard = bitboard.insert(i, j);
@@ -306,7 +310,7 @@ impl Board {
     // Note: The result also contains empty fields and fields
     fn fields_to_flip(&self, card_to_play: CardToPlay) -> Result<BitBoard, IllegalCardPlayed> {
         let (card_i, card_j) = (card_to_play.i, card_to_play.j);
-        let mut flipped = BitBoard::empty_board_centered_at(card_i, card_j);
+        let mut flipped = BitBoard::empty_board_centered_at(self.bitboards_center);
         match card_to_play.card.rank {
             Rank::Jack => {
                 for (i, j) in [
@@ -369,8 +373,8 @@ impl Diff {
     fn apply(self, board: &Board) -> Board {
         let mut new_fields = Vec::with_capacity(board.fields.len() + 1);
         let mut bbox = BoundingBox::singleton(self.new_card_i, self.new_card_j);
-        let mut bitboards =
-            [BitBoard::empty_board_centered_at(self.new_card_i, self.new_card_j); 4];
+        let bitboards_center = (self.new_card_i, self.new_card_j);
+        let mut bitboards = [BitBoard::empty_board_centered_at(bitboards_center); 4];
         let mut field_for_new_card_already_exists = false;
 
         // Copy over the fields while applying changes and updating derived
@@ -409,6 +413,7 @@ impl Diff {
         }
 
         Board {
+            bitboards_center,
             fields: new_fields,
             bbox,
             bitboards,

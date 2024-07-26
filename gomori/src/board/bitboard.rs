@@ -1,19 +1,55 @@
 use std::fmt::{self, Debug};
 
-static I_SHIFT: u8 = 49 + 7;
-static J_SHIFT: u8 = 49;
-static BOARD_MASK: u64 = 0x1ffffffffffff;
+const I_SHIFT: u8 = 49 + 7;
+const J_SHIFT: u8 = 49;
+const BOARD_MASK: u64 = 0x1ffffffffffff;
+const OFFSET_MASK: u64 = 0x7ffe000000000000;
 
-/// A [`Copy`] board representation that stores only a single
-/// bit per field.
+/// A compact board representation that stores only a single
+/// bit per field, equivalent to a set of coordinates.
 ///
-/// Intended for storing all cards of a particular suit, for
-/// efficient line detection.
+/// Every `BitBoard` is obtained from a [`Board`](crate::Board), and can, for instance, store
+/// [which fields on the board have a visible diamond card on them](crate::Board::diamonds).
+/// So a `BitBoard` is kind of like a "view" into a particular `Board`.
+///
+/// Two `BitBoard`s can be combined with operations like [`&`](std::ops::BitAnd),
+/// [`|`](std::ops::BitOr`), or [`difference()`](BitBoard::difference).
+/// It's important that when two `BitBoard`s are combined, they must both originate[^note] from the same `Board`.
+/// The reason is that the area represented by `BitBoard`s from different `Board`s may not be identical, so some
+/// contents of one board may be unrepresentable in the other `BitBoard`.
+/// This is only checked with a debug assertion.
+///
+/// [^note]: "`BitBoard` X originates from `Board` B" means that that X was returned by some method of B,
+///     or that X is the result of combining/processing `BitBoard`s that originate from X.
 ///
 /// It can be converted back into a list of coordinate pairs by
 /// means of its [`IntoIterator`] instance.
 ///
-/// Note that its "mutating" methods return a new object instead of really mutating.
+/// # Note on immutability
+///
+/// This is an immutable type, so its "mutating" methods return a
+/// new value instead of really mutating in-place (except for `std::ops::BitXxxAssign` trait methods).
+/// It is also [`Copy`], so a value is not consumed by methods with `self` receiver.
+///
+/// # Implementation
+///
+/// Internally, a `BitBoard` is (1) an `(offset_i, offset_j)` coordinate pair and (2) a 49-bit-bitset. The bitset encodes an 7 x 7 area with one bit per field, like so:
+///
+///
+/// ```text
+/// 1 0 1 1 0 0 1
+/// 1 1 1 0 1 0 1
+/// 0 1 1 0 0 1 0
+/// 0 0 1 1 1 1 0
+/// 0 1 1 0 1 0 1
+/// 0 0 0 1 0 1 1
+/// 0 0 0 1 0 0 1
+/// ```
+///
+/// The offset is added to every local `(i, j)` coordinate in that field (the local `i` and `j` both range from `0` to `6`) to obtain the true `(i, j)` coordinate.
+///
+/// Every valid board would fit in a 4 x 4 area, so why 7 x 7? One reason is that with a 7 x 7 board,
+/// we can be sure that not only the board itself can be represented, but also the next card, as long as it is in the board's [playable area](crate::Board::playable_area).
 #[cfg_attr(feature = "python", pyo3::pyclass)]
 #[derive(Clone, Copy)]
 pub struct BitBoard {
@@ -58,7 +94,7 @@ pub struct BitBoard {
 // !!!!!! NOTE: Keep in sync with pymethods impl block !!!!!!
 impl BitBoard {
     // This is only crate-public because it is valid only for a certain range of i and j
-    pub(crate) fn empty_board_centered_at(i: i8, j: i8) -> Self {
+    pub(crate) fn empty_board_centered_at((i, j): (i8, i8)) -> Self {
         debug_assert!(i >= -52);
         debug_assert!(j >= -52);
         debug_assert!(i <= 52);
@@ -75,10 +111,11 @@ impl BitBoard {
         }
     }
 
-    /// Set the bit at the specified location to `true`.
+    /// Set the bit for the specified coordinate to `true`.
     ///
-    /// This is only valid for coordinates in a 7x7 area around the center of the `BitBoard`.
-    /// Other indices will cause a panic in debug mode.
+    /// This function must only be used with coordinates in the underlying board's [`playable_area`](crate::Board::playable_area).
+    /// Other coordinates may exceed the 7x7 area stored in the `BitBoard`, and that will cause a panic in debug mode.
+    /// In release mode, no checks are performed, and data
     #[must_use]
     pub(crate) fn insert(self, i: i8, j: i8) -> Self {
         let idx = self.arr_idx(i, j);
@@ -138,11 +175,9 @@ impl BitBoard {
     /// Computes the difference to another `BitBoard`.
     #[must_use]
     pub fn difference(self, other: BitBoard) -> BitBoard {
-        // Recenter the other bitboard to our center, which may lose some coordinates.
-        // But that's fine - since these coordinates are not representable in our bitboard,
-        // they can't be contained in our bitboard anyway.
+        debug_assert_eq!(self.bits & OFFSET_MASK, other.bits & OFFSET_MASK);
         Self {
-            bits: self.bits & !other.board_bits_shifted_to_offset_lossy(self.offset()),
+            bits: self.bits & !(other.bits & BOARD_MASK),
         }
     }
 
@@ -160,10 +195,8 @@ impl BitBoard {
         debug_assert!(point_i <= 52);
         debug_assert!(point_j <= 52);
 
-        let offset = (point_i - 3, point_j - 3);
-        // The bits we may lose by shifting to the new center are exactly those that are
-        // more than 3 fields away from the point. They don't count anyway.
-        let bits_centered = self.board_bits_shifted_to_offset_lossy(offset);
+        let (offset_i, offset_j) = self.offset();
+        let delta = (point_i - offset_i - 3, point_j - offset_j - 3);
 
         let mut line_bits = 0;
         // These patterns are lines on the 7x7 board - horizontal, vertical, and two diagonal.
@@ -173,14 +206,14 @@ impl BitBoard {
             0x1010101010101u64,
             0x41041041040u64,
         ] {
-            let pattern_intersect = bits_centered & pattern;
+            let pattern_intersect = self.bits & shift_2d_lossy(pattern, delta);
             debug_assert!(pattern_intersect.count_ones() <= 4);
             if pattern_intersect.count_ones() == 4 {
                 line_bits |= pattern_intersect;
             }
         }
         Self {
-            bits: encode_offset(offset.0, offset.1) | line_bits,
+            bits: self.bits & OFFSET_MASK | line_bits,
         }
     }
 
@@ -203,65 +236,6 @@ impl BitBoard {
     fn offset(self) -> (i8, i8) {
         decode_offset(self.bits)
     }
-
-    fn board_bits_shifted_to_offset_lossy(self, new_offset: (i8, i8)) -> u64 {
-        debug_assert!(new_offset.0 >= -55);
-        debug_assert!(new_offset.1 >= -55);
-        debug_assert!(new_offset.0 <= 49);
-        debug_assert!(new_offset.1 <= 49);
-
-        // A mask for the bits that do not get "shifted out" when changing the offset's i value.
-        // The index into this array is (offset_i_new - offset_i + 7), clamped to (0, 14).
-        static SHIFT_MASK_I: [u64; 15] = [
-            0b0000000000000000000000000000000000000000000000000,
-            0b0000000000000000000000000000000000000000001111111,
-            0b0000000000000000000000000000000000011111111111111,
-            0b0000000000000000000000000000111111111111111111111,
-            0b0000000000000000000001111111111111111111111111111,
-            0b0000000000000011111111111111111111111111111111111,
-            0b0000000111111111111111111111111111111111111111111,
-            0b1111111111111111111111111111111111111111111111111,
-            0b1111111111111111111111111111111111111111110000000,
-            0b1111111111111111111111111111111111100000000000000,
-            0b1111111111111111111111111111000000000000000000000,
-            0b1111111111111111111110000000000000000000000000000,
-            0b1111111111111100000000000000000000000000000000000,
-            0b1111111000000000000000000000000000000000000000000,
-            0b0000000000000000000000000000000000000000000000000,
-        ];
-
-        // A mask for the bits that do not get "shifted out" when changing the offset's j value.
-        // The index into this array is (offset_j_new - offset_j + 7), clamped to (0, 14).
-        static SHIFT_MASK_J: [u64; 15] = [
-            0b0000000000000000000000000000000000000000000000000,
-            0b0000001000000100000010000001000000100000010000001,
-            0b0000011000001100000110000011000001100000110000011,
-            0b0000111000011100001110000111000011100001110000111,
-            0b0001111000111100011110001111000111100011110001111,
-            0b0011111001111100111110011111001111100111110011111,
-            0b0111111011111101111110111111011111101111110111111,
-            0b1111111111111111111111111111111111111111111111111,
-            0b1111110111111011111101111110111111011111101111110,
-            0b1111100111110011111001111100111110011111001111100,
-            0b1111000111100011110001111000111100011110001111000,
-            0b1110000111000011100001110000111000011100001110000,
-            0b1100000110000011000001100000110000011000001100000,
-            0b1000000100000010000001000000100000010000001000000,
-            0b0000000000000000000000000000000000000000000000000,
-        ];
-
-        let (offset_i, offset_j) = self.offset();
-        let (diff_i, diff_j) = (new_offset.0 - offset_i, new_offset.1 - offset_j);
-        let mask_i = SHIFT_MASK_I[(diff_i + 7).clamp(0, 14) as usize];
-        let mask_j = SHIFT_MASK_J[(diff_j + 7).clamp(0, 14) as usize];
-        let valid_bits = self.bits & mask_i & mask_j;
-        let shift_by = diff_i * 7 + diff_j;
-        if shift_by > 0 {
-            valid_bits >> shift_by.min(63)
-        } else {
-            valid_bits << shift_by.abs().min(63)
-        }
-    }
 }
 
 fn decode_offset(bits: u64) -> (i8, i8) {
@@ -278,6 +252,112 @@ fn encode_offset(offset_i: i8, offset_j: i8) -> u64 {
     let offset_i_bits = u64::from(offset_i as u8 & 0b01111111u8) << I_SHIFT;
     let offset_j_bits = u64::from(offset_j as u8 & 0b01111111u8) << J_SHIFT;
     offset_i_bits | offset_j_bits
+}
+
+// A 2D shift can be implemented as a mask + a bitshift.
+// If we only did a bitshift without masking, then we'd get artifacts from bits wrapping around.
+fn shift_2d_lossy(bits: u64, (delta_i, delta_j): (i8, i8)) -> u64 {
+    // A mask for the bits that do not get "shifted out" by moving all points by delta_i along the i axis.
+    static SHIFT_MASK_I: [u64; 15] = [
+        0b0000000000000000000000000000000000000000000000000,
+        0b1111111000000000000000000000000000000000000000000,
+        0b1111111111111100000000000000000000000000000000000,
+        0b1111111111111111111110000000000000000000000000000,
+        0b1111111111111111111111111111000000000000000000000,
+        0b1111111111111111111111111111111111100000000000000,
+        0b1111111111111111111111111111111111111111110000000,
+        0b1111111111111111111111111111111111111111111111111,
+        0b0000000111111111111111111111111111111111111111111,
+        0b0000000000000011111111111111111111111111111111111,
+        0b0000000000000000000001111111111111111111111111111,
+        0b0000000000000000000000000000111111111111111111111,
+        0b0000000000000000000000000000000000011111111111111,
+        0b0000000000000000000000000000000000000000001111111,
+        0b0000000000000000000000000000000000000000000000000,
+    ];
+
+    static SHIFT_MASK_J: [u64; 15] = [
+        0b0000000000000000000000000000000000000000000000000,
+        0b1000000100000010000001000000100000010000001000000,
+        0b1100000110000011000001100000110000011000001100000,
+        0b1110000111000011100001110000111000011100001110000,
+        0b1111000111100011110001111000111100011110001111000,
+        0b1111100111110011111001111100111110011111001111100,
+        0b1111110111111011111101111110111111011111101111110,
+        0b1111111111111111111111111111111111111111111111111,
+        0b0111111011111101111110111111011111101111110111111,
+        0b0011111001111100111110011111001111100111110011111,
+        0b0001111000111100011110001111000111100011110001111,
+        0b0000111000011100001110000111000011100001110000111,
+        0b0000011000001100000110000011000001100000110000011,
+        0b0000001000000100000010000001000000100000010000001,
+        0b0000000000000000000000000000000000000000000000000,
+    ];
+
+    // Larger values will get clamped to the ends, where all bits will be masked out.
+    let mask_i = SHIFT_MASK_I[(delta_i + 7).clamp(0, 14) as usize];
+    let mask_j = SHIFT_MASK_J[(delta_j + 7).clamp(0, 14) as usize];
+    let valid_bits = bits & mask_i & mask_j;
+    let shift_by = delta_i * 7 + delta_j;
+    if shift_by > 0 {
+        valid_bits << shift_by.min(63)
+    } else {
+        valid_bits >> shift_by.abs().min(63)
+    }
+}
+
+impl std::ops::BitAnd for BitBoard {
+    type Output = Self;
+
+    fn bitand(self, rhs: Self) -> Self::Output {
+        debug_assert_eq!(self.bits & OFFSET_MASK, rhs.bits & OFFSET_MASK);
+        Self {
+            bits: self.bits & rhs.bits,
+        }
+    }
+}
+
+impl std::ops::BitOr for BitBoard {
+    type Output = Self;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        debug_assert_eq!(self.bits & OFFSET_MASK, rhs.bits & OFFSET_MASK);
+        Self {
+            bits: self.bits | rhs.bits,
+        }
+    }
+}
+
+impl std::ops::BitXor for BitBoard {
+    type Output = Self;
+
+    fn bitxor(self, rhs: Self) -> Self::Output {
+        debug_assert_eq!(self.bits & OFFSET_MASK, rhs.bits & OFFSET_MASK);
+        Self {
+            bits: self.bits ^ (rhs.bits & BOARD_MASK),
+        }
+    }
+}
+
+impl std::ops::BitAndAssign for BitBoard {
+    fn bitand_assign(&mut self, rhs: Self) {
+        debug_assert_eq!(self.bits & OFFSET_MASK, rhs.bits & OFFSET_MASK);
+        self.bits &= rhs.bits;
+    }
+}
+
+impl std::ops::BitOrAssign for BitBoard {
+    fn bitor_assign(&mut self, rhs: Self) {
+        debug_assert_eq!(self.bits & OFFSET_MASK, rhs.bits & OFFSET_MASK);
+        self.bits |= rhs.bits;
+    }
+}
+
+impl std::ops::BitXorAssign for BitBoard {
+    fn bitxor_assign(&mut self, rhs: Self) {
+        debug_assert_eq!(self.bits & OFFSET_MASK, rhs.bits & OFFSET_MASK);
+        self.bits ^= rhs.bits & BOARD_MASK;
+    }
 }
 
 impl Debug for BitBoard {
@@ -377,41 +457,25 @@ mod tests {
             // Restrict i and j to the range [-52, 52]
             let i = i % 53;
             let j = j % 53;
-            BitBoard::empty_board_centered_at(i, j).offset() == (i - 3, j - 3)
+            BitBoard::empty_board_centered_at((i, j)).offset() == (i - 3, j - 3)
         }
     }
 
     #[test]
     fn shift_far() {
-        let bb = BitBoard::empty_board_centered_at(12, 30)
+        let bb = BitBoard::empty_board_centered_at((12, 30))
             .insert(11, 32)
             .insert(12, 30)
             .insert(12, 33)
             .insert(15, 30);
         // None of the coordinates on the board are representable with that offset.
-        let bits_shifted = bb.board_bits_shifted_to_offset_lossy((0, 0));
+        let bits_shifted = shift_2d_lossy(bb.bits, (-12, -30));
         assert_eq!(bits_shifted, 0);
     }
 
     #[test]
-    fn shift() {
-        let bb = BitBoard::empty_board_centered_at(12, 30)
-            .insert(11, 32)
-            .insert(12, 31)
-            .insert(12, 33)
-            .insert(15, 30);
-        let (offset_i, offset_j) = (11, 31);
-        let bits_shifted = bb.board_bits_shifted_to_offset_lossy((offset_i, offset_j));
-        let bb_shifted = BitBoard {
-            bits: bits_shifted | encode_offset(offset_i, offset_j),
-        };
-        let coordinates_after_shift = Vec::from_iter(bb_shifted);
-        assert_eq!(coordinates_after_shift, vec![(11, 32), (12, 31), (12, 33)]);
-    }
-
-    #[test]
     fn detect_line() {
-        let bb = BitBoard::empty_board_centered_at(10, 10)
+        let bb = BitBoard::empty_board_centered_at((10, 10))
             .insert(8, 11)
             .insert(11, 11)
             .insert(12, 11)

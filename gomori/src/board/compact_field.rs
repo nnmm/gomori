@@ -5,13 +5,17 @@ const TOP_CARD_MASK: u64 = 0x3f0000000000000;
 const HIDDEN_CARDS_MASK: u64 = 0xfffffffffffff;
 const CLEAR_TOP_CARD_MASK: u64 = !(TOP_CARD_INDICATOR_BIT | TOP_CARD_MASK);
 
-/// An efficient representation of a single field on the board.
+/// A compact representation of a single field on the board.
 ///
 /// Contains an optional top card (i.e. face up), plus a set of hidden [`Card`]s.
 /// It doesn't store the order of hidden cards, or which of the hidden cards are
 /// facing up and down, because that doesn't matter for the game.
 ///
-/// Note that its "mutating" methods return a new object instead of really mutating.
+/// # Note on immutability
+///
+/// This is an immutable type, so its "mutating" methods return a
+/// new value instead of really mutating in-place. It is also [`Copy`],
+/// so a value is not consumed by methods with `self` receiver.
 #[cfg_attr(feature = "python", pyo3::pyclass)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct CompactField {

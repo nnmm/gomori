@@ -15,6 +15,12 @@ use crate::Card;
 /// set = set.insert(card!("2♥"));
 /// assert_eq!(Vec::from_iter(set), vec![card!("2♥"), card!("7♥")]);
 /// ```
+///
+/// # Note on immutability
+///
+/// This is an immutable type, so its "mutating" methods return a
+/// new value instead of really mutating in-place (except for `std::ops::BitXxxAssign` trait methods).
+/// It is also [`Copy`], so a value is not consumed by methods with `self` receiver.
 #[cfg_attr(feature = "python", pyo3::pyclass)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CardsSet {
