@@ -61,22 +61,32 @@ pub struct CalculatedEffects<'a> {
 
 // !!!!!! NOTE: Keep in sync with pymethods impl block !!!!!!
 impl Board {
-    /// Creates a new board from a list of fields.
+    /// Creates a new board from a list of [`Field`]s.
     ///
     /// Panics if the fields are (obviously) invalid, e.g. if it is larger than 4 x 4.
     pub fn new(fields: &[Field]) -> Self {
+        Self::from_fields_list(
+            fields
+                .iter()
+                .map(|f| (f.i, f.j, CompactField::from(f)))
+                .collect(),
+        )
+    }
+
+    /// Creates a new board from a list of [`CompactField`]s.
+    ///
+    /// Panics if the fields are (obviously) invalid, e.g. if it is larger than 4 x 4.
+    pub fn from_fields_list(fields: Vec<(i8, i8, CompactField)>) -> Self {
         assert!(!fields.is_empty());
-        let mut compact_fields = Vec::with_capacity(fields.len());
-        let bitboards_center = (fields[0].i, fields[0].j);
-        let mut bbox = BoundingBox::singleton(fields[0].i, fields[0].j);
+        let bitboards_center = (fields[0].0, fields[0].1);
+        let mut bbox = BoundingBox::singleton(fields[0].0, fields[0].1);
         let mut bitboards = [BitBoard::empty_board_centered_at(bitboards_center); 4];
 
-        for field in fields {
-            debug_assert!(field.top_card.is_some() || !field.hidden_cards.is_empty());
-            bbox.update(field.i, field.j);
-            compact_fields.push((field.i, field.j, CompactField::from(field)));
-            if let Some(Card { suit, .. }) = field.top_card {
-                bitboards[suit as usize] = bitboards[suit as usize].insert(field.i, field.j);
+        for field in &fields {
+            debug_assert!(field.2.top_card().is_some() || !field.2.hidden_cards().is_empty());
+            bbox.update(field.0, field.1);
+            if let Some(Card { suit, .. }) = field.2.top_card() {
+                bitboards[suit as usize] = bitboards[suit as usize].insert(field.0, field.1);
             }
         }
 
@@ -84,7 +94,7 @@ impl Board {
         assert!(bbox.size_j() <= BOARD_SIZE as u8);
 
         Self {
-            fields: compact_fields,
+            fields,
             bitboards_center,
             bbox,
             bitboards,
@@ -442,6 +452,11 @@ mod python {
 
     #[pymethods]
     impl Board {
+        #[new]
+        fn py_from_fields_list(fields: Vec<(i8, i8, CompactField)>) -> Self {
+            Self::from_fields_list(fields)
+        }
+
         #[pyo3(name = "to_fields")]
         fn py_to_fields(&self) -> Vec<(i8, i8, CompactField)> {
             self.fields.clone()
