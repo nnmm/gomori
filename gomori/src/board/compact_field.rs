@@ -142,6 +142,32 @@ mod python {
 
     #[pymethods]
     impl CompactField {
+        #[new]
+        #[pyo3(signature = (*, top_card, hidden_cards = CardsSet::new()))]
+        fn py_new(top_card: Option<Card>, hidden_cards: CardsSet) -> Self {
+            let field = Self {
+                bits: hidden_cards.bits,
+            };
+            if let Some(c) = top_card {
+                field.place_card(c)
+            } else {
+                field
+            }
+        }
+
+        fn __repr__(&self) -> String {
+            let top_card_repr = if let Some(c) = self.top_card() {
+                c.__repr__()
+            } else {
+                String::from("None")
+            };
+            let hidden_cards_repr = self.hidden_cards().__repr__();
+            format!(
+                "CompactField(top_card={}, hidden_cards={})",
+                top_card_repr, hidden_cards_repr
+            )
+        }
+
         fn __bool__(&self) -> bool {
             !self.is_empty()
         }

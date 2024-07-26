@@ -213,7 +213,8 @@ mod python {
             self.into_iter()
         }
 
-        fn __repr__(&self) -> String {
+        // Needed in other __repr__ functions
+        pub(crate) fn __repr__(&self) -> String {
             let card_reprs: Vec<_> = self.into_iter().map(|c| c.__repr__()).collect();
             format!("CardsSet([{}])", card_reprs.join(", "))
         }
