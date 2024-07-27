@@ -458,6 +458,29 @@ mod python {
             !self.is_empty()
         }
 
+        fn __and__(&self, other: BitBoard) -> BitBoard {
+            *self & other
+        }
+
+        fn __or__(&self, other: BitBoard) -> BitBoard {
+            *self | other
+        }
+
+        fn __xor__(&self, other: BitBoard) -> BitBoard {
+            *self ^ other
+        }
+
+        fn __iand__(&mut self, other: BitBoard) {
+            *self &= other
+        }
+
+        fn __ior__(&mut self, other: BitBoard) {
+            *self |= other
+        }
+
+        fn __ixor__(&mut self, other: BitBoard) {
+            *self ^= other
+        }
         // Python exclusive
         fn to_matrix_and_offset(&self) -> ([[bool; 7]; 7], (i8, i8)) {
             let arr = std::array::from_fn(|i_local| {
