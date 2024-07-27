@@ -1,4 +1,7 @@
-use std::fmt::{self, Debug};
+use std::{
+    fmt::{self, Debug},
+    iter::FusedIterator,
+};
 
 const I_SHIFT: u8 = 49 + 7;
 const J_SHIFT: u8 = 49;
@@ -51,7 +54,7 @@ const OFFSET_MASK: u64 = 0x7ffe000000000000;
 /// Every valid board would fit in a 4 x 4 area, so why 7 x 7? One reason is that with a 7 x 7 board,
 /// we can be sure that not only the board itself can be represented, but also the next card, as long as it is in the board's [playable area](crate::Board::playable_area).
 #[cfg_attr(feature = "python", pyo3::pyclass)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct BitBoard {
     /// The low 49 bits are the board itself (7x7)
     /// The next highest 7 bits are the j offset.
@@ -165,6 +168,31 @@ impl BitBoard {
         let idx = self.arr_idx(i, j);
         Self {
             bits: self.bits & !(1u64 << idx),
+        }
+    }
+
+    /// Returns all lines on the field consisting of at least three points.
+    ///
+    /// An exception are the diagonals in the far four corners of the bitboard, for example:
+    ///
+    /// ```text
+    /// 0 0 0 0 0 0 0
+    /// 0 0 0 0 0 0 0
+    /// 0 0 0 0 0 0 0
+    /// 0 0 0 1 0 0 0
+    /// 0 0 0 0 0 0 1
+    /// 0 0 0 0 0 1 0
+    /// 0 0 0 0 1 0 0
+    /// ```
+    ///
+    /// They are not included, since the fourth field for those diagonals is outside the
+    /// playable area of the board.
+    #[must_use]
+    pub fn threes_in_a_row(self) -> ThreesInARowIter {
+        ThreesInARowIter {
+            bitboard: self,
+            n: 0,
+            orientation: LineOrientation::IRow,
         }
     }
 
@@ -310,6 +338,68 @@ fn shift_2d_lossy(bits: u64, (delta_i, delta_j): (i8, i8)) -> u64 {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LineOrientation {
+    /// A line of coordinates that all share the same `i` value.
+    IRow,
+    /// A line of coordinates that all share the same `j` value.
+    JRow,
+    /// A diagonal where `i` and `j` increase.
+    Diagonal,
+    /// A diagonal where `i` increases while `j` decreases.
+    Antidiagonal,
+}
+
+/// Iterator returned by [`BitBoard::threes_in_a_row()`].
+pub struct ThreesInARowIter {
+    bitboard: BitBoard,
+    // Bitset of the local i coordinates whose rows have at least 3 bits set
+    n: i8,
+    orientation: LineOrientation,
+}
+
+impl Iterator for ThreesInARowIter {
+    type Item = (LineOrientation, BitBoard);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while self.n < 7 {
+            let current_orientation = self.orientation;
+            let mask = match current_orientation {
+                LineOrientation::IRow => {
+                    let mask = 0b1111111u64 << (self.n * 7);
+                    (self.orientation, self.n) = (LineOrientation::JRow, self.n);
+                    mask
+                }
+                LineOrientation::JRow => {
+                    let mask = 0b1000000100000010000001000000100000010000001u64 << self.n;
+                    (self.orientation, self.n) = (LineOrientation::Diagonal, self.n);
+                    mask
+                }
+                LineOrientation::Diagonal => {
+                    let mask = shift_2d_lossy(0x1010101010101u64, (3 - self.n, 0));
+                    (self.orientation, self.n) = (LineOrientation::Antidiagonal, self.n);
+                    mask
+                }
+                LineOrientation::Antidiagonal => {
+                    let mask = shift_2d_lossy(0x41041041040u64, (self.n - 3, 0));
+                    (self.orientation, self.n) = (LineOrientation::IRow, self.n + 1);
+                    mask
+                }
+            };
+            let intersection = self.bitboard.bits & mask;
+            if intersection.count_ones() >= 3 {
+                let bb = BitBoard {
+                    bits: self.bitboard.bits & OFFSET_MASK | intersection,
+                };
+                return Some((current_orientation, bb));
+            }
+        }
+        None
+    }
+}
+
+impl FusedIterator for ThreesInARowIter {}
+
 impl std::ops::BitAnd for BitBoard {
     type Output = Self;
 
@@ -366,18 +456,25 @@ impl std::ops::BitXorAssign for BitBoard {
 
 impl Debug for BitBoard {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let digits = format!("{:049b}", self.bits & BOARD_MASK);
-        let mut s = String::with_capacity(49 * 2);
-        for (idx, c) in digits.chars().rev().enumerate() {
-            s.push(c);
-            if idx % 7 == 6 {
-                s.push('\n');
-            } else {
-                s.push(' ');
-            }
-        }
-        write!(f, "{}", s)
+        write!(f, "{}", print_bits(self.bits))
     }
+}
+
+// Prints the bitset as a 2D array, least significant bit first,
+// such that the local coordinate (0, 0) is in the top left corner,
+// and i is the vertical and j the horizontal coordinate.
+fn print_bits(bits: u64) -> String {
+    let digits = format!("{:049b}", bits & BOARD_MASK);
+    let mut s = String::with_capacity(49 * 2);
+    for (idx, c) in digits.chars().rev().enumerate() {
+        s.push(c);
+        if idx % 7 == 6 {
+            s.push('\n');
+        } else {
+            s.push(' ');
+        }
+    }
+    s
 }
 
 /// Iterator produced by [`BitBoard::into_iter()`].
@@ -410,7 +507,20 @@ impl Iterator for BitBoardIter {
             Some((offset_i + idx / 7, offset_j + idx % 7))
         }
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let size = self.bitboard.num_entries() as usize;
+        (size, Some(size))
+    }
 }
+
+impl ExactSizeIterator for BitBoardIter {
+    fn len(&self) -> usize {
+        self.bitboard.num_entries() as usize
+    }
+}
+
+impl FusedIterator for BitBoardIter {}
 
 #[cfg(feature = "python")]
 mod python {
@@ -535,6 +645,38 @@ mod tests {
         assert_eq!(
             Vec::from_iter(bb.lines_going_through_point(9, 9)),
             Vec::new()
+        );
+    }
+
+    #[test]
+    fn threes_in_a_row() {
+        let bb_1 = BitBoard::empty_board_centered_at((-20, -10));
+        assert_eq!(bb_1.threes_in_a_row().count(), 0);
+        let bb_2 = BitBoard::empty_board_centered_at((-20, -10))
+            .insert(-20, -10)
+            .insert(-21, -10)
+            .insert(-21, -9)
+            .insert(-20, -9);
+        assert_eq!(bb_2.threes_in_a_row().count(), 0);
+        let bb_3 = BitBoard::empty_board_centered_at((-20, -10))
+            .insert(-20, -9)
+            .insert(-20, -10)
+            .insert(-20, -12);
+        assert_eq!(
+            Vec::from_iter(bb_3.threes_in_a_row()),
+            vec![(LineOrientation::IRow, bb_3)]
+        );
+        assert_eq!(
+            Vec::from_iter(bb_3.insert(-21, -9).threes_in_a_row()),
+            vec![(LineOrientation::IRow, bb_3)]
+        );
+        let bb_4 = BitBoard::empty_board_centered_at((-20, -10))
+            .insert(-22, -10)
+            .insert(-21, -9)
+            .insert(-20, -8);
+        assert_eq!(
+            Vec::from_iter(bb_4.threes_in_a_row()),
+            vec![(LineOrientation::Diagonal, bb_4)]
         );
     }
 }

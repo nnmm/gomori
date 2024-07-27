@@ -1,3 +1,5 @@
+use std::iter::FusedIterator;
+
 use crate::Card;
 
 /// A compact set of [`Card`]s.
@@ -180,7 +182,20 @@ impl Iterator for CardsSetIter {
             Some(Card::from_index(card_idx))
         }
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let size = self.bits.count_ones() as usize;
+        (size, Some(size))
+    }
 }
+
+impl ExactSizeIterator for CardsSetIter {
+    fn len(&self) -> usize {
+        self.bits.count_ones() as usize
+    }
+}
+
+impl FusedIterator for CardsSetIter {}
 
 #[cfg(feature = "python")]
 mod python {
