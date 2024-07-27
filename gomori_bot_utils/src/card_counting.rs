@@ -6,6 +6,10 @@ use gomori::{
 
 /// Information about the cards in the game, derived from
 /// observing all played cards.
+///
+/// This can be automatically updated by implementing [`HasCardCounter`] for your bot
+/// and wrapping it in a `CardCountingWrapper`.
+#[derive(Clone, Copy, Debug)]
 pub struct CardCounter {
     /// Cards in our draw pile.
     pub draw_pile: CardsSet,
@@ -44,12 +48,14 @@ impl Default for CardCounter {
     }
 }
 
-/// Implement this trait on your bot.
+/// Implement this trait on your bot to allow it to be used with a [`CardCountingWrapper`].
+///
 /// Basically the same as `DerefMut<Target=CardCounter>`
 pub trait HasCardCounter {
     fn get_counter(&mut self) -> &mut CardCounter;
 }
 
+/// Automatically counts cards for your bot.
 pub struct CardCountingWrapper<T>
 where
     T: HasCardCounter,

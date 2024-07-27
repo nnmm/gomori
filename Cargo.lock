@@ -230,7 +230,7 @@ dependencies = [
 
 [[package]]
 name = "gomori"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "pyo3",
@@ -241,7 +241,7 @@ dependencies = [
 
 [[package]]
 name = "gomori-py"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "gomori",
  "gomori_bot_utils",
@@ -250,7 +250,7 @@ dependencies = [
 
 [[package]]
 name = "gomori_bot_utils"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "gomori",
