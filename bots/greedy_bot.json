@@ -1,4 +1,4 @@
 {
 	"nick": "GreedyBot",
-	"cmd": ["target/release/greedy_bot"]
+	"cmd": ["target/release/greedy_bot", "--seed", "123456"]
 }

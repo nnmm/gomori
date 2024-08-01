@@ -24,7 +24,7 @@ use crate::Card;
 /// new value instead of really mutating in-place (except for `std::ops::BitXxxAssign` trait methods).
 /// It is also [`Copy`], so a value is not consumed by methods with `self` receiver.
 #[cfg_attr(feature = "python", pyo3::pyclass)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct CardsSet {
     // Only the low 52 bits are used.
     pub(crate) bits: u64,
@@ -131,12 +131,6 @@ impl std::ops::Not for CardsSet {
         Self {
             bits: !self.bits & VALID_BITS,
         }
-    }
-}
-
-impl Default for CardsSet {
-    fn default() -> Self {
-        Self { bits: 0 }
     }
 }
 

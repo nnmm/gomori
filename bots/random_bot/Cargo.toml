@@ -11,3 +11,4 @@ gomori = { path = "../../gomori" }
 gomori_bot_utils = { path = "../../gomori_bot_utils" }
 anyhow = "1.0.86"
 serde_json = "1.0.118"
+clap = { version = "4.5.13", features = ["derive"] }

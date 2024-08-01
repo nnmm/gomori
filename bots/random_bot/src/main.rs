@@ -1,18 +1,27 @@
 use std::collections::BTreeSet;
 
+use clap::Parser;
 use gomori::{Board, Card, CardToPlay, CardsSet, Color, Field, PlayTurnResponse, Rank};
 use gomori_bot_utils::Bot;
-use rand::{rngs::ThreadRng, seq::SliceRandom};
+use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
+
+#[derive(Parser)]
+struct Args {
+    /// RNG seed
+    #[arg(long)]
+    seed: Option<u64>,
+}
 
 fn main() -> anyhow::Result<()> {
-    RandomBot {
-        rng: rand::thread_rng(),
-    }
-    .run()
+    let args = Args::parse();
+    let seed = args.seed.unwrap_or_else(rand::random);
+    let rng = StdRng::seed_from_u64(seed);
+
+    RandomBot { rng }.run()
 }
 
 struct RandomBot {
-    rng: ThreadRng,
+    rng: StdRng,
 }
 
 fn possible_card_placements(board: &Board, cards: &BTreeSet<Card>) -> Vec<(i8, i8, Card)> {

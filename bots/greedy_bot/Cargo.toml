@@ -10,3 +10,4 @@ anyhow = "1.0.86"
 rand = "0.8.5"
 gomori = { path = "../../gomori" }
 gomori_bot_utils = { path = "../../gomori_bot_utils" }
+clap = { version = "4.5.13", features = ["derive"] }

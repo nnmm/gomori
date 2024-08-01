@@ -1,18 +1,28 @@
 use std::collections::BTreeSet;
 
+use clap::Parser;
 use gomori::{Board, Card, CardToPlay, CardsSet, Color, Field, PlayTurnResponse, Rank};
 use gomori_bot_utils::Bot;
-use rand::{rngs::ThreadRng, seq::SliceRandom};
+use rand::rngs::StdRng;
+use rand::{seq::SliceRandom, SeedableRng};
+
+#[derive(Parser)]
+struct Args {
+    /// RNG seed
+    #[arg(long)]
+    seed: Option<u64>,
+}
 
 fn main() -> anyhow::Result<()> {
-    GreedyBot {
-        rng: rand::thread_rng(),
-    }
-    .run()
+    let args = Args::parse();
+    let seed = args.seed.unwrap_or_else(rand::random);
+    let rng = StdRng::seed_from_u64(seed);
+
+    GreedyBot { rng }.run()
 }
 
 struct GreedyBot {
-    rng: ThreadRng,
+    rng: StdRng,
 }
 
 impl GreedyBot {
@@ -34,11 +44,7 @@ impl GreedyBot {
         });
     }
 
-    fn best_card_placement(
-        &mut self,
-        board: &Board,
-        cards: &BTreeSet<Card>,
-    ) -> Option<CardToPlay> {
+    fn best_card_placement(&mut self, board: &Board, cards: &BTreeSet<Card>) -> Option<CardToPlay> {
         let mut top_choices: Vec<CardToPlay> = Vec::new();
         let mut top_score = 0;
         for &card in cards.iter() {

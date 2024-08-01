@@ -63,6 +63,15 @@ where
     bot: T,
 }
 
+impl<T> CardCountingWrapper<T>
+where
+    T: HasCardCounter,
+{
+    pub fn new(bot: T) -> Self {
+        Self { bot }
+    }
+}
+
 impl<T: HasCardCounter + Bot> Bot for CardCountingWrapper<T> {
     fn new_game(&mut self, color: Color) {
         *self.bot.get_counter() = CardCounter::new(color);
