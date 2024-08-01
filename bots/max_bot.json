@@ -1,0 +1,4 @@
+{
+	"nick": "MaxBot",
+	"cmd": ["target/release/max_bot"]	
+}
