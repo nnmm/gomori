@@ -26,6 +26,8 @@ pub struct Board {
     /// There is exactly one entry in this list for every field with at least one card on it.
     ///
     /// The `bbox` and `bitboards` fields are derived from this list.
+    ///
+    /// Note: This is not guaranteed to be sorted.
     fields: Vec<(i8, i8, CompactField)>,
     /// The center coordinate for all bitboards produced by this board.
     /// Using a consistent center coordinate enables binary operations like bitwise or.
@@ -298,7 +300,8 @@ impl Board {
     }
 
     pub fn to_fields_vec(&self) -> Vec<Field> {
-        self.fields
+        let mut fields_vec: Vec<Field> = self
+            .fields
             .iter()
             .filter_map(|&(i, j, cf)| {
                 if cf.is_empty() {
@@ -312,7 +315,9 @@ impl Board {
                     })
                 }
             })
-            .collect()
+            .collect();
+        fields_vec.sort_by_key(|f| (f.i, f.j));
+        fields_vec
     }
 
     // Internal helper function to compute fields where the top cards are flipped face-down.
@@ -419,7 +424,6 @@ impl Diff {
                     bitboards[self.new_card.suit as usize].insert(self.new_card_i, self.new_card_j);
             }
             new_fields.push((self.new_card_i, self.new_card_j, new_field));
-            new_fields.sort_by_key(|&(i, j, _)| (i, j));
         }
 
         Board {
