@@ -327,6 +327,7 @@ dependencies = [
  "anyhow",
  "clap",
  "gomori",
+ "itertools",
  "rand",
  "serde",
  "serde_json",
