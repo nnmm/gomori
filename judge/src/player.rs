@@ -49,6 +49,10 @@ pub struct PlayerWithGameState<'a> {
 impl Player {
     pub fn new(path: &Path) -> anyhow::Result<Self> {
         let config = PlayerConfig::load(path)?;
+        Self::from_config(&config)
+    }
+
+    pub fn from_config(config: &PlayerConfig) -> anyhow::Result<Self> {
         let child_proc = Command::new(&config.cmd[0])
             .args(&config.cmd[1..])
             .stdin(Stdio::piped())
@@ -58,7 +62,7 @@ impl Player {
         info!(cmd = ?config.cmd, "Spawned child process");
 
         Ok(Self {
-            name: config.nick,
+            name: config.nick.clone(),
             stdin: child_proc.stdin.expect("Could not access stdin"),
             stdout: BufReader::new(child_proc.stdout.expect("Could not access stdout")),
             buf: String::new(),

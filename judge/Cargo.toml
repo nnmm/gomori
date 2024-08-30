@@ -9,6 +9,7 @@ edition = "2021"
 anyhow = "1.0.86"
 clap = { version = "4.5.13", features = ["derive"] }
 gomori = { path = "../gomori" }
+itertools = "0.13.0"
 rand = "0.8.5"
 serde = "1.0.203"
 serde_json = "1.0.118"
